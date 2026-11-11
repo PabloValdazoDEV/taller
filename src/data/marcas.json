@@ -1,0 +1,1550 @@
+[
+{
+"nombre": "9ff",
+"slug": "9ff"
+},
+{
+"nombre": "Abadal",
+"slug": "abadal"
+},
+{
+"nombre": "Abarth",
+"slug": "abarth"
+},
+{
+"nombre": "Abbott-Detroit",
+"slug": "abbott-detroit"
+},
+{
+"nombre": "ABT",
+"slug": "abt"
+},
+{
+"nombre": "AC",
+"slug": "ac"
+},
+{
+"nombre": "Acura",
+"slug": "acura"
+},
+{
+"nombre": "Aiways",
+"slug": "aiways"
+},
+{
+"nombre": "Aixam",
+"slug": "aixam"
+},
+{
+"nombre": "Alfa Romeo",
+"slug": "alfa-romeo"
+},
+{
+"nombre": "Alpina",
+"slug": "alpina"
+},
+{
+"nombre": "Alpine",
+"slug": "alpine"
+},
+{
+"nombre": "Alta",
+"slug": "alta"
+},
+{
+"nombre": "Alvis",
+"slug": "alvis"
+},
+{
+"nombre": "AMC",
+"slug": "amc"
+},
+{
+"nombre": "Apollo",
+"slug": "apollo"
+},
+{
+"nombre": "Arash",
+"slug": "arash"
+},
+{
+"nombre": "Arcfox",
+"slug": "arcfox"
+},
+{
+"nombre": "Ariel",
+"slug": "ariel"
+},
+{
+"nombre": "ARO",
+"slug": "aro"
+},
+{
+"nombre": "Arrinera",
+"slug": "arrinera"
+},
+{
+"nombre": "Arrival",
+"slug": "arrival"
+},
+{
+"nombre": "Artega",
+"slug": "artega"
+},
+{
+"nombre": "Ascari",
+"slug": "ascari"
+},
+{
+"nombre": "Askam",
+"slug": "askam"
+},
+{
+"nombre": "Aspark",
+"slug": "aspark"
+},
+{
+"nombre": "Aston Martin",
+"slug": "aston-martin"
+},
+{
+"nombre": "Atalanta",
+"slug": "atalanta"
+},
+{
+"nombre": "Auburn",
+"slug": "auburn"
+},
+{
+"nombre": "Audi",
+"slug": "audi"
+},
+{
+"nombre": "Audi Sport",
+"slug": "audi-sport"
+},
+{
+"nombre": "Austin",
+"slug": "austin"
+},
+{
+"nombre": "Autobacs",
+"slug": "autobacs"
+},
+{
+"nombre": "Autobianchi",
+"slug": "autobianchi"
+},
+{
+"nombre": "Axon",
+"slug": "axon"
+},
+{
+"nombre": "BAC",
+"slug": "bac"
+},
+{
+"nombre": "BAIC Motor",
+"slug": "baic-motor"
+},
+{
+"nombre": "Baojun",
+"slug": "baojun"
+},
+{
+"nombre": "BeiBen",
+"slug": "beiben"
+},
+{
+"nombre": "Bentley",
+"slug": "bentley"
+},
+{
+"nombre": "Berkeley",
+"slug": "berkeley"
+},
+{
+"nombre": "Berliet",
+"slug": "berliet"
+},
+{
+"nombre": "Bertone",
+"slug": "bertone"
+},
+{
+"nombre": "Bestune",
+"slug": "bestune"
+},
+{
+"nombre": "BharatBenz",
+"slug": "bharatbenz"
+},
+{
+"nombre": "Bitter",
+"slug": "bitter"
+},
+{
+"nombre": "Bizzarrini",
+"slug": "bizzarrini"
+},
+{
+"nombre": "BMW",
+"slug": "bmw"
+},
+{
+"nombre": "BMW M",
+"slug": "bmw-m"
+},
+{
+"nombre": "Borgward",
+"slug": "borgward"
+},
+{
+"nombre": "Bowler",
+"slug": "bowler"
+},
+{
+"nombre": "Brabus",
+"slug": "brabus"
+},
+{
+"nombre": "Brammo",
+"slug": "brammo"
+},
+{
+"nombre": "Brilliance",
+"slug": "brilliance"
+},
+{
+"nombre": "Bristol",
+"slug": "bristol"
+},
+{
+"nombre": "Brooke",
+"slug": "brooke"
+},
+{
+"nombre": "Bufori",
+"slug": "bufori"
+},
+{
+"nombre": "Bugatti",
+"slug": "bugatti"
+},
+{
+"nombre": "Buick",
+"slug": "buick"
+},
+{
+"nombre": "BYD",
+"slug": "byd"
+},
+{
+"nombre": "Byton",
+"slug": "byton"
+},
+{
+"nombre": "Cadillac",
+"slug": "cadillac"
+},
+{
+"nombre": "CAMC",
+"slug": "camc"
+},
+{
+"nombre": "Canoo",
+"slug": "canoo"
+},
+{
+"nombre": "Caparo",
+"slug": "caparo"
+},
+{
+"nombre": "Carlsson",
+"slug": "carlsson"
+},
+{
+"nombre": "Caterham",
+"slug": "caterham"
+},
+{
+"nombre": "Changan",
+"slug": "changan"
+},
+{
+"nombre": "Changfeng",
+"slug": "changfeng"
+},
+{
+"nombre": "Chery",
+"slug": "chery"
+},
+{
+"nombre": "Chevrolet",
+"slug": "chevrolet"
+},
+{
+"nombre": "Chevrolet Corvette",
+"slug": "chevrolet-corvette"
+},
+{
+"nombre": "Chrysler",
+"slug": "chrysler"
+},
+{
+"nombre": "Cisitalia",
+"slug": "cisitalia"
+},
+{
+"nombre": "Citroën",
+"slug": "citroen"
+},
+{
+"nombre": "Cizeta",
+"slug": "cizeta"
+},
+{
+"nombre": "Cole",
+"slug": "cole"
+},
+{
+"nombre": "Corre La Licorne",
+"slug": "corre-la-licorne"
+},
+{
+"nombre": "CUPRA",
+"slug": "cupra"
+},
+{
+"nombre": "Dacia",
+"slug": "dacia"
+},
+{
+"nombre": "Daewoo",
+"slug": "daewoo"
+},
+{
+"nombre": "DAF",
+"slug": "daf"
+},
+{
+"nombre": "Daihatsu",
+"slug": "daihatsu"
+},
+{
+"nombre": "Daimler",
+"slug": "daimler"
+},
+{
+"nombre": "Dartz",
+"slug": "dartz"
+},
+{
+"nombre": "Datsun",
+"slug": "datsun"
+},
+{
+"nombre": "David Brown",
+"slug": "david-brown"
+},
+{
+"nombre": "Dayun",
+"slug": "dayun"
+},
+{
+"nombre": "De Tomaso",
+"slug": "de-tomaso"
+},
+{
+"nombre": "Delage",
+"slug": "delage"
+},
+{
+"nombre": "DeSoto",
+"slug": "desoto"
+},
+{
+"nombre": "Detroit Electric",
+"slug": "detroit-electric"
+},
+{
+"nombre": "Devel Sixteen",
+"slug": "devel-sixteen"
+},
+{
+"nombre": "Diatto",
+"slug": "diatto"
+},
+{
+"nombre": "DINA",
+"slug": "dina"
+},
+{
+"nombre": "DKW",
+"slug": "dkw"
+},
+{
+"nombre": "DMC",
+"slug": "dmc"
+},
+{
+"nombre": "Dodge",
+"slug": "dodge"
+},
+{
+"nombre": "Dodge Viper",
+"slug": "dodge-viper"
+},
+{
+"nombre": "Dongfeng",
+"slug": "dongfeng"
+},
+{
+"nombre": "Donkervoort",
+"slug": "donkervoort"
+},
+{
+"nombre": "Drako",
+"slug": "drako"
+},
+{
+"nombre": "DS",
+"slug": "ds"
+},
+{
+"nombre": "Duesenberg",
+"slug": "duesenberg"
+},
+{
+"nombre": "Eagle",
+"slug": "eagle"
+},
+{
+"nombre": "EDAG",
+"slug": "edag"
+},
+{
+"nombre": "Edsel",
+"slug": "edsel"
+},
+{
+"nombre": "Eicher",
+"slug": "eicher"
+},
+{
+"nombre": "Elemental",
+"slug": "elemental"
+},
+{
+"nombre": "Elfin",
+"slug": "elfin"
+},
+{
+"nombre": "Elva",
+"slug": "elva"
+},
+{
+"nombre": "Englon",
+"slug": "englon"
+},
+{
+"nombre": "ERF",
+"slug": "erf"
+},
+{
+"nombre": "Eterniti",
+"slug": "eterniti"
+},
+{
+"nombre": "Exeed",
+"slug": "exeed"
+},
+{
+"nombre": "Facel Vega",
+"slug": "facel-vega"
+},
+{
+"nombre": "Faraday Future",
+"slug": "faraday-future"
+},
+{
+"nombre": "FAW",
+"slug": "faw"
+},
+{
+"nombre": "FAW Jiefang",
+"slug": "faw-jiefang"
+},
+{
+"nombre": "Ferrari",
+"slug": "ferrari"
+},
+{
+"nombre": "Fiat",
+"slug": "fiat"
+},
+{
+"nombre": "Fioravanti",
+"slug": "fioravanti"
+},
+{
+"nombre": "Fisker",
+"slug": "fisker"
+},
+{
+"nombre": "Foden",
+"slug": "foden"
+},
+{
+"nombre": "Force Motors",
+"slug": "force-motors"
+},
+{
+"nombre": "Ford",
+"slug": "ford"
+},
+{
+"nombre": "Ford Mustang",
+"slug": "ford-mustang"
+},
+{
+"nombre": "Foton",
+"slug": "foton"
+},
+{
+"nombre": "FPV",
+"slug": "fpv"
+},
+{
+"nombre": "Franklin",
+"slug": "franklin"
+},
+{
+"nombre": "Freightliner",
+"slug": "freightliner"
+},
+{
+"nombre": "FSO",
+"slug": "fso"
+},
+{
+"nombre": "GAC Group",
+"slug": "gac-group"
+},
+{
+"nombre": "Gardner Douglas",
+"slug": "gardner-douglas"
+},
+{
+"nombre": "GAZ",
+"slug": "gaz"
+},
+{
+"nombre": "Geely",
+"slug": "geely"
+},
+{
+"nombre": "General Motors",
+"slug": "general-motors"
+},
+{
+"nombre": "Genesis",
+"slug": "genesis"
+},
+{
+"nombre": "Geo",
+"slug": "geo"
+},
+{
+"nombre": "Geometry",
+"slug": "geometry"
+},
+{
+"nombre": "Gilbern",
+"slug": "gilbern"
+},
+{
+"nombre": "Gillet",
+"slug": "gillet"
+},
+{
+"nombre": "Ginetta",
+"slug": "ginetta"
+},
+{
+"nombre": "GMC",
+"slug": "gmc"
+},
+{
+"nombre": "Golden Dragon",
+"slug": "golden-dragon"
+},
+{
+"nombre": "Gonow",
+"slug": "gonow"
+},
+{
+"nombre": "Great Wall",
+"slug": "great-wall"
+},
+{
+"nombre": "Grinnall",
+"slug": "grinnall"
+},
+{
+"nombre": "Gumpert",
+"slug": "gumpert"
+},
+{
+"nombre": "Hafei",
+"slug": "hafei"
+},
+{
+"nombre": "Haima",
+"slug": "haima"
+},
+{
+"nombre": "Haval",
+"slug": "haval"
+},
+{
+"nombre": "Hawtai",
+"slug": "hawtai"
+},
+{
+"nombre": "Hennessey",
+"slug": "hennessey"
+},
+{
+"nombre": "Higer",
+"slug": "higer"
+},
+{
+"nombre": "Hillman",
+"slug": "hillman"
+},
+{
+"nombre": "Hindustan Motors",
+"slug": "hindustan-motors"
+},
+{
+"nombre": "Hino",
+"slug": "hino"
+},
+{
+"nombre": "HiPhi",
+"slug": "hiphi"
+},
+{
+"nombre": "Hispano-Suiza",
+"slug": "hispano-suiza"
+},
+{
+"nombre": "Holden",
+"slug": "holden"
+},
+{
+"nombre": "Hommell",
+"slug": "hommell"
+},
+{
+"nombre": "Honda",
+"slug": "honda"
+},
+{
+"nombre": "Hongqi",
+"slug": "hongqi"
+},
+{
+"nombre": "Hongyan",
+"slug": "hongyan"
+},
+{
+"nombre": "Horch",
+"slug": "horch"
+},
+{
+"nombre": "HSV",
+"slug": "hsv"
+},
+{
+"nombre": "Hudson",
+"slug": "hudson"
+},
+{
+"nombre": "Hummer",
+"slug": "hummer"
+},
+{
+"nombre": "Hupmobile",
+"slug": "hupmobile"
+},
+{
+"nombre": "Hyundai",
+"slug": "hyundai"
+},
+{
+"nombre": "IC Bus",
+"slug": "ic-bus"
+},
+{
+"nombre": "IH",
+"slug": "ih"
+},
+{
+"nombre": "IKCO",
+"slug": "ikco"
+},
+{
+"nombre": "Infiniti",
+"slug": "infiniti"
+},
+{
+"nombre": "Innocenti",
+"slug": "innocenti"
+},
+{
+"nombre": "Intermeccanica",
+"slug": "intermeccanica"
+},
+{
+"nombre": "International",
+"slug": "international"
+},
+{
+"nombre": "Irizar",
+"slug": "irizar"
+},
+{
+"nombre": "Isdera",
+"slug": "isdera"
+},
+{
+"nombre": "Iso",
+"slug": "iso"
+},
+{
+"nombre": "Isuzu",
+"slug": "isuzu"
+},
+{
+"nombre": "Iveco",
+"slug": "iveco"
+},
+{
+"nombre": "JAC",
+"slug": "jac"
+},
+{
+"nombre": "Jaguar",
+"slug": "jaguar"
+},
+{
+"nombre": "Jawa",
+"slug": "jawa"
+},
+{
+"nombre": "JBA Motors",
+"slug": "jba-motors"
+},
+{
+"nombre": "Jeep",
+"slug": "jeep"
+},
+{
+"nombre": "Jensen",
+"slug": "jensen"
+},
+{
+"nombre": "Jetour",
+"slug": "jetour"
+},
+{
+"nombre": "Jetta",
+"slug": "jetta"
+},
+{
+"nombre": "JMC",
+"slug": "jmc"
+},
+{
+"nombre": "Kaiser",
+"slug": "kaiser"
+},
+{
+"nombre": "Kamaz",
+"slug": "kamaz"
+},
+{
+"nombre": "Karlmann King",
+"slug": "karlmann-king"
+},
+{
+"nombre": "Karma",
+"slug": "karma"
+},
+{
+"nombre": "Keating",
+"slug": "keating"
+},
+{
+"nombre": "Kenworth",
+"slug": "kenworth"
+},
+{
+"nombre": "Kia",
+"slug": "kia"
+},
+{
+"nombre": "King Long",
+"slug": "king-long"
+},
+{
+"nombre": "Koenigsegg",
+"slug": "koenigsegg"
+},
+{
+"nombre": "KTM",
+"slug": "ktm"
+},
+{
+"nombre": "Lada",
+"slug": "lada"
+},
+{
+"nombre": "Lagonda",
+"slug": "lagonda"
+},
+{
+"nombre": "Lamborghini",
+"slug": "lamborghini"
+},
+{
+"nombre": "Lancia",
+"slug": "lancia"
+},
+{
+"nombre": "Land Rover",
+"slug": "land-rover"
+},
+{
+"nombre": "Landwind",
+"slug": "landwind"
+},
+{
+"nombre": "Laraki",
+"slug": "laraki"
+},
+{
+"nombre": "Leapmotor",
+"slug": "leapmotor"
+},
+{
+"nombre": "LEVC",
+"slug": "levc"
+},
+{
+"nombre": "Lexus",
+"slug": "lexus"
+},
+{
+"nombre": "Leyland",
+"slug": "leyland"
+},
+{
+"nombre": "Li Auto",
+"slug": "li-auto"
+},
+{
+"nombre": "Lifan",
+"slug": "lifan"
+},
+{
+"nombre": "Ligier",
+"slug": "ligier"
+},
+{
+"nombre": "Lincoln",
+"slug": "lincoln"
+},
+{
+"nombre": "Lister",
+"slug": "lister"
+},
+{
+"nombre": "Lloyd",
+"slug": "lloyd"
+},
+{
+"nombre": "Lobini",
+"slug": "lobini"
+},
+{
+"nombre": "Lordstown",
+"slug": "lordstown"
+},
+{
+"nombre": "Lotus",
+"slug": "lotus"
+},
+{
+"nombre": "Lucid",
+"slug": "lucid"
+},
+{
+"nombre": "Luxgen",
+"slug": "luxgen"
+},
+{
+"nombre": "Lynk & Co",
+"slug": "lynk-and-co"
+},
+{
+"nombre": "Mack",
+"slug": "mack"
+},
+{
+"nombre": "Mahindra",
+"slug": "mahindra"
+},
+{
+"nombre": "MAN",
+"slug": "man"
+},
+{
+"nombre": "Mansory",
+"slug": "mansory"
+},
+{
+"nombre": "Marcos",
+"slug": "marcos"
+},
+{
+"nombre": "Marlin",
+"slug": "marlin"
+},
+{
+"nombre": "Maserati",
+"slug": "maserati"
+},
+{
+"nombre": "Mastretta",
+"slug": "mastretta"
+},
+{
+"nombre": "Maxus",
+"slug": "maxus"
+},
+{
+"nombre": "Maybach",
+"slug": "maybach"
+},
+{
+"nombre": "MAZ",
+"slug": "maz"
+},
+{
+"nombre": "Mazda",
+"slug": "mazda"
+},
+{
+"nombre": "Mazzanti",
+"slug": "mazzanti"
+},
+{
+"nombre": "McLaren",
+"slug": "mclaren"
+},
+{
+"nombre": "Melkus",
+"slug": "melkus"
+},
+{
+"nombre": "Mercedes-AMG",
+"slug": "mercedes-amg"
+},
+{
+"nombre": "Mercedes-Benz",
+"slug": "mercedes-benz"
+},
+{
+"nombre": "Mercury",
+"slug": "mercury"
+},
+{
+"nombre": "Merkur",
+"slug": "merkur"
+},
+{
+"nombre": "MEV",
+"slug": "mev"
+},
+{
+"nombre": "MG",
+"slug": "mg"
+},
+{
+"nombre": "Microcar",
+"slug": "microcar"
+},
+{
+"nombre": "MINI",
+"slug": "mini"
+},
+{
+"nombre": "Mitsubishi",
+"slug": "mitsubishi"
+},
+{
+"nombre": "Mitsuoka",
+"slug": "mitsuoka"
+},
+{
+"nombre": "MK",
+"slug": "mk"
+},
+{
+"nombre": "Morgan",
+"slug": "morgan"
+},
+{
+"nombre": "Morris",
+"slug": "morris"
+},
+{
+"nombre": "Mosler",
+"slug": "mosler"
+},
+{
+"nombre": "Navistar",
+"slug": "navistar"
+},
+{
+"nombre": "NEVS",
+"slug": "nevs"
+},
+{
+"nombre": "Nikola",
+"slug": "nikola"
+},
+{
+"nombre": "NIO",
+"slug": "nio"
+},
+{
+"nombre": "Nissan",
+"slug": "nissan"
+},
+{
+"nombre": "Nissan GT-R",
+"slug": "nissan-gt-r"
+},
+{
+"nombre": "Nissan Nismo",
+"slug": "nissan-nismo"
+},
+{
+"nombre": "Noble",
+"slug": "noble"
+},
+{
+"nombre": "Oldsmobile",
+"slug": "oldsmobile"
+},
+{
+"nombre": "Oltcit",
+"slug": "oltcit"
+},
+{
+"nombre": "Omoda",
+"slug": "omoda"
+},
+{
+"nombre": "Opel",
+"slug": "opel"
+},
+{
+"nombre": "OSCA",
+"slug": "osca"
+},
+{
+"nombre": "Paccar",
+"slug": "paccar"
+},
+{
+"nombre": "Packard",
+"slug": "packard"
+},
+{
+"nombre": "Pagani",
+"slug": "pagani"
+},
+{
+"nombre": "Panhard",
+"slug": "panhard"
+},
+{
+"nombre": "Panoz",
+"slug": "panoz"
+},
+{
+"nombre": "Pegaso",
+"slug": "pegaso"
+},
+{
+"nombre": "Perodua",
+"slug": "perodua"
+},
+{
+"nombre": "Peterbilt",
+"slug": "peterbilt"
+},
+{
+"nombre": "Peugeot",
+"slug": "peugeot"
+},
+{
+"nombre": "PGO",
+"slug": "pgo"
+},
+{
+"nombre": "Pierce-Arrow",
+"slug": "pierce-arrow"
+},
+{
+"nombre": "Pininfarina",
+"slug": "pininfarina"
+},
+{
+"nombre": "Plymouth",
+"slug": "plymouth"
+},
+{
+"nombre": "Polestar",
+"slug": "polestar"
+},
+{
+"nombre": "Pontiac",
+"slug": "pontiac"
+},
+{
+"nombre": "Porsche",
+"slug": "porsche"
+},
+{
+"nombre": "Praga",
+"slug": "praga"
+},
+{
+"nombre": "Premier",
+"slug": "premier"
+},
+{
+"nombre": "Prodrive",
+"slug": "prodrive"
+},
+{
+"nombre": "Proton",
+"slug": "proton"
+},
+{
+"nombre": "Qoros",
+"slug": "qoros"
+},
+{
+"nombre": "Radical",
+"slug": "radical"
+},
+{
+"nombre": "RAM",
+"slug": "ram"
+},
+{
+"nombre": "Rambler",
+"slug": "rambler"
+},
+{
+"nombre": "Ranz",
+"slug": "ranz"
+},
+{
+"nombre": "Renault",
+"slug": "renault"
+},
+{
+"nombre": "Renault Samsung",
+"slug": "renault-samsung"
+},
+{
+"nombre": "Rezvani",
+"slug": "rezvani"
+},
+{
+"nombre": "Riley",
+"slug": "riley"
+},
+{
+"nombre": "Rimac",
+"slug": "rimac"
+},
+{
+"nombre": "Rinspeed",
+"slug": "rinspeed"
+},
+{
+"nombre": "Rivian",
+"slug": "rivian"
+},
+{
+"nombre": "Roewe",
+"slug": "roewe"
+},
+{
+"nombre": "Rolls-Royce",
+"slug": "rolls-royce"
+},
+{
+"nombre": "Ronart",
+"slug": "ronart"
+},
+{
+"nombre": "Rossion",
+"slug": "rossion"
+},
+{
+"nombre": "Rover",
+"slug": "rover"
+},
+{
+"nombre": "RUF",
+"slug": "ruf"
+},
+{
+"nombre": "Saab",
+"slug": "saab"
+},
+{
+"nombre": "SAIC Motor",
+"slug": "saic-motor"
+},
+{
+"nombre": "Saipa",
+"slug": "saipa"
+},
+{
+"nombre": "Saleen",
+"slug": "saleen"
+},
+{
+"nombre": "Saturn",
+"slug": "saturn"
+},
+{
+"nombre": "Scania",
+"slug": "scania"
+},
+{
+"nombre": "Scion",
+"slug": "scion"
+},
+{
+"nombre": "SEAT",
+"slug": "seat"
+},
+{
+"nombre": "Setra",
+"slug": "setra"
+},
+{
+"nombre": "SEV",
+"slug": "sev"
+},
+{
+"nombre": "Shacman",
+"slug": "shacman"
+},
+{
+"nombre": "Simca",
+"slug": "simca"
+},
+{
+"nombre": "Singer",
+"slug": "singer"
+},
+{
+"nombre": "Singulato",
+"slug": "singulato"
+},
+{
+"nombre": "Sinotruk",
+"slug": "sinotruk"
+},
+{
+"nombre": "Sisu",
+"slug": "sisu"
+},
+{
+"nombre": "Škoda",
+"slug": "skoda"
+},
+{
+"nombre": "Smart",
+"slug": "smart"
+},
+{
+"nombre": "Soueast",
+"slug": "soueast"
+},
+{
+"nombre": "Spania GTA",
+"slug": "spania-gta"
+},
+{
+"nombre": "Spirra",
+"slug": "spirra"
+},
+{
+"nombre": "Spyker",
+"slug": "spyker"
+},
+{
+"nombre": "SsangYong (KGM)",
+"slug": "ssangyong"
+},
+{
+"nombre": "SSC",
+"slug": "ssc"
+},
+{
+"nombre": "Sterling",
+"slug": "sterling"
+},
+{
+"nombre": "Studebaker",
+"slug": "studebaker"
+},
+{
+"nombre": "Stutz",
+"slug": "stutz"
+},
+{
+"nombre": "Subaru",
+"slug": "subaru"
+},
+{
+"nombre": "Suffolk",
+"slug": "suffolk"
+},
+{
+"nombre": "Suzuki",
+"slug": "suzuki"
+},
+{
+"nombre": "Talbot",
+"slug": "talbot"
+},
+{
+"nombre": "Tata",
+"slug": "tata"
+},
+{
+"nombre": "Tatra",
+"slug": "tatra"
+},
+{
+"nombre": "Tauro",
+"slug": "tauro"
+},
+{
+"nombre": "TechArt",
+"slug": "techart"
+},
+{
+"nombre": "Tesla",
+"slug": "tesla"
+},
+{
+"nombre": "Toyota",
+"slug": "toyota"
+},
+{
+"nombre": "Toyota Alphard",
+"slug": "toyota-alphard"
+},
+{
+"nombre": "Toyota Century",
+"slug": "toyota-century"
+},
+{
+"nombre": "Toyota Crown",
+"slug": "toyota-crown"
+},
+{
+"nombre": "Tramontana",
+"slug": "tramontana"
+},
+{
+"nombre": "Trion",
+"slug": "trion"
+},
+{
+"nombre": "Triumph",
+"slug": "triumph"
+},
+{
+"nombre": "Troller",
+"slug": "troller"
+},
+{
+"nombre": "Tucker",
+"slug": "tucker"
+},
+{
+"nombre": "TVR",
+"slug": "tvr"
+},
+{
+"nombre": "UAZ",
+"slug": "uaz"
+},
+{
+"nombre": "UD",
+"slug": "ud"
+},
+{
+"nombre": "Ultima",
+"slug": "ultima"
+},
+{
+"nombre": "Vandenbrink",
+"slug": "vandenbrink"
+},
+{
+"nombre": "Vauxhall",
+"slug": "vauxhall"
+},
+{
+"nombre": "Vector",
+"slug": "vector"
+},
+{
+"nombre": "Vencer",
+"slug": "vencer"
+},
+{
+"nombre": "Venturi",
+"slug": "venturi"
+},
+{
+"nombre": "Venucia",
+"slug": "venucia"
+},
+{
+"nombre": "VinFast",
+"slug": "vinfast"
+},
+{
+"nombre": "VLF",
+"slug": "vlf"
+},
+{
+"nombre": "Volkswagen",
+"slug": "volkswagen"
+},
+{
+"nombre": "Volvo",
+"slug": "volvo"
+},
+{
+"nombre": "W Motors",
+"slug": "w-motors"
+},
+{
+"nombre": "Wanderer",
+"slug": "wanderer"
+},
+{
+"nombre": "Wartburg",
+"slug": "wartburg"
+},
+{
+"nombre": "Weltmeister",
+"slug": "weltmeister"
+},
+{
+"nombre": "Western Star",
+"slug": "western-star"
+},
+{
+"nombre": "Westfield",
+"slug": "westfield"
+},
+{
+"nombre": "WEY",
+"slug": "wey"
+},
+{
+"nombre": "Wiesmann",
+"slug": "wiesmann"
+},
+{
+"nombre": "Willys-Overland",
+"slug": "willys-overland"
+},
+{
+"nombre": "Workhorse",
+"slug": "workhorse"
+},
+{
+"nombre": "Wuling",
+"slug": "wuling"
+},
+{
+"nombre": "XPeng",
+"slug": "xpeng"
+},
+{
+"nombre": "Yulon",
+"slug": "yulon"
+},
+{
+"nombre": "Yutong",
+"slug": "yutong"
+},
+{
+"nombre": "Zarooq Motors",
+"slug": "zarooq-motors"
+},
+{
+"nombre": "Zastava",
+"slug": "zastava"
+},
+{
+"nombre": "ZAZ",
+"slug": "zaz"
+},
+{
+"nombre": "Zeekr",
+"slug": "zeekr"
+},
+{
+"nombre": "Zenos",
+"slug": "zenos"
+},
+{
+"nombre": "Zenvo",
+"slug": "zenvo"
+},
+{
+"nombre": "Zhongtong",
+"slug": "zhongtong"
+},
+{
+"nombre": "Zinoro",
+"slug": "zinoro"
+},
+{
+"nombre": "Zotye",
+"slug": "zotye"
+}
+]

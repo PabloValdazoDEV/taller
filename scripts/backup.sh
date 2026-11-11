@@ -1,0 +1,14 @@
+#!/bin/sh
+# Copia de seguridad diaria (programar en cron del VPS):
+#   0 3 * * * /ruta/al/proyecto/scripts/backup.sh >> /var/log/taller-backup.log 2>&1
+# Guarda BD + ficheros (fotos y PDF firmados) y conserva 14 días.
+set -e
+cd "$(dirname "$0")/.."
+DEST=${BACKUP_DIR:-/var/backups/taller}
+FECHA=$(date +%Y%m%d-%H%M)
+mkdir -p "$DEST"
+docker compose -f docker-compose.prod.yml exec -T db pg_dump -U taller -Fc taller > "$DEST/bd-$FECHA.dump"
+docker compose -f docker-compose.prod.yml run --rm --no-deps -v "$DEST":/backup --entrypoint sh app \
+  -c "tar czf /backup/ficheros-$FECHA.tgz -C /data storage"
+find "$DEST" -type f -mtime +14 -delete
+echo "✔ Backup $FECHA en $DEST"

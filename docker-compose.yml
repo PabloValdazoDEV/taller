@@ -1,0 +1,15 @@
+# Desarrollo local: solo la base de datos. En producción se añade el servicio "app".
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: taller
+      POSTGRES_PASSWORD: taller
+      POSTGRES_DB: taller
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
