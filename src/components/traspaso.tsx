@@ -2,13 +2,15 @@
 
 import { cx } from "./ui";
 
-export type Mecanico = { id: string; nombre: string; color?: string | null };
+export type Mecanico = { id: string; nombre: string; color?: string | null; especialidades?: string[] };
 
-/** Sugiere quién hace una fase: el mecánico cuyo nombre menciona la fase («Marta (pintura)» → «Pintura»). */
+/** Sugiere quién hace una fase: el mecánico de esa especialidad o cuyo nombre la menciona («Marta (pintura)» → «Pintura»). */
 export function sugerirMecanico(mecanicos: Mecanico[], fase: string, actualId: string | null) {
   const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const palabras = norm(fase).split(/[^a-z]+/).filter((p) => p.length > 3);
-  const encaja = mecanicos.find((m) => palabras.some((p) => norm(m.nombre).includes(p)));
+  const encaja =
+    mecanicos.find((m) => m.especialidades?.some((e) => e !== "mecanica" && palabras.includes(e))) ??
+    mecanicos.find((m) => palabras.some((p) => norm(m.nombre).includes(p)));
   return encaja?.id ?? actualId;
 }
 

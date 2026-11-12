@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, Copy, FileSignature, FileText, Loader2, MessageCircle, Plus, Tablet, X } from "lucide-react";
+import { AlertTriangle, Check, Copy, FileSignature, FileText, Loader2, MessageCircle, Plus, Tablet, Trash2, X } from "lucide-react";
 import { Boton, Campo, Input, Pastilla, Tarjeta, TituloSeccion, Vacio, cx } from "@/components/ui";
 import { Dialogo } from "@/components/dialogo";
 import { fmtEuros } from "@/lib/importes";
-import { fmtFecha } from "@/lib/formato";
-import { aprobarSinFirma, crearPresupuesto, rechazarPresupuesto } from "../presupuestos-actions";
+import { diaISO, fmtFecha } from "@/lib/formato";
+import { fmtHoras } from "@/lib/ampliacion";
+import { aprobarSinFirma, borrarPresupuesto, crearPresupuesto, rechazarPresupuesto } from "../presupuestos-actions";
 
 export type PresupuestoVista = {
   id: string;
@@ -23,6 +24,10 @@ export type PresupuestoVista = {
   decididoNombre: string | null;
   decisionNota: string | null;
   firmado: boolean;
+  horasEstimadas: string | null;
+  fechaEntrega: string | null;
+  /** Ampliación: el presupuesto aceptado al que amplía */
+  amplia: { numero: string; total: number } | null;
   /** Solo si está pendiente y vigente */
   enlace: string | null;
   whatsapp: string | null;
@@ -36,27 +41,33 @@ const ESTADO: Record<PresupuestoVista["estado"], { t: string; c: string }> = {
 };
 const VIA = { tablet: "firmado en el taller", enlace: "por enlace en su móvil", manual: "sin firma" } as const;
 
-export function Presupuestos({ otId, presupuestos, hayLineas, totalActual, editable, cliente }: {
+export function Presupuestos({ otId, presupuestos, hayLineas, totalActual, editable, cliente, horasSugeridas, fechaPrevista, averiaPendiente }: {
   otId: string;
   presupuestos: PresupuestoVista[];
   hayLineas: boolean;
   totalActual: number;
   editable: boolean;
   cliente: string;
+  /** Horas de mano de obra (o, si ya hay uno aceptado, las de más) para proponer en el nuevo */
+  horasSugeridas: number;
+  fechaPrevista: string | null;
+  /** Hay una avería adicional abierta que afecta al precio */
+  averiaPendiente: boolean;
 }) {
   const [pend, start] = useTransition();
   const [error, setError] = useState("");
   const [dialogo, setDialogo] = useState<{ tipo: "aprobar" | "rechazar"; p: PresupuestoVista } | null>(null);
+  const [creando, setCreando] = useState(false);
   const [copiado, setCopiado] = useState<string | null>(null);
   const pendiente = presupuestos.find((p) => p.estado === "pendiente");
   const ultimoAprobado = presupuestos.find((p) => p.estado === "aprobado");
   const cambiado = ultimoAprobado && hayLineas && ultimoAprobado.total !== totalActual && !pendiente;
 
-  const crear = () => {
-    if (pendiente && !confirm(`El presupuesto ${pendiente.numero} aún está pendiente. El nuevo lo sustituirá. ¿Seguir?`)) return;
+  const borrar = (p: PresupuestoVista) => {
+    if (!confirm(`¿Borrar el presupuesto ${p.numero}? Si se lo habéis enviado, su enlace dejará de funcionar.`)) return;
     start(async () => {
       setError("");
-      const r = await crearPresupuesto(otId);
+      const r = await borrarPresupuesto(p.id);
       if (r.error) setError(r.error);
     });
   };
@@ -66,8 +77,8 @@ export function Presupuestos({ otId, presupuestos, hayLineas, totalActual, edita
       <TituloSeccion
         accion={
           editable && hayLineas && (
-            <Boton variante="secundario" className="min-h-10 px-3" onClick={crear} disabled={pend}>
-              {pend ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Plus className="size-4" aria-hidden />} {presupuestos.length ? "Nuevo presupuesto" : "Crear presupuesto"}
+            <Boton variante="secundario" className="min-h-10 px-3" onClick={() => setCreando(true)} disabled={pend}>
+              {pend ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Plus className="size-4" aria-hidden />} {ultimoAprobado ? "Ampliar presupuesto" : presupuestos.length ? "Nuevo presupuesto" : "Crear presupuesto"}
             </Boton>
           )
         }
@@ -76,11 +87,18 @@ export function Presupuestos({ otId, presupuestos, hayLineas, totalActual, edita
       </TituloSeccion>
 
       {cambiado && (
-        <p className="mb-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="mb-3 flex flex-wrap items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <span>
-            Los importes han cambiado desde el presupuesto aceptado ({fmtEuros(ultimoAprobado.total)} → {fmtEuros(totalActual)}). Si el cliente tiene que aprobar la diferencia, crea un presupuesto nuevo.
+          <span className="min-w-0 flex-1">
+            Los importes han cambiado desde el presupuesto aceptado ({fmtEuros(ultimoAprobado.total)} → {fmtEuros(totalActual)}). Antes de hacer lo nuevo, el cliente debe aceptar la ampliación.
           </span>
+          {editable && <Boton variante="secundario" className="min-h-10 px-3" onClick={() => setCreando(true)} disabled={pend}>Crear ampliación</Boton>}
+        </div>
+      )}
+      {averiaPendiente && !pendiente && !cambiado && editable && (
+        <p className="mb-3 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-900">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>Hay una avería adicional que afecta al precio: añade lo nuevo en «Importes» y {ultimoAprobado ? "crea la ampliación" : "crea el presupuesto"} para que el cliente la acepte.</span>
         </p>
       )}
 
@@ -95,10 +113,22 @@ export function Presupuestos({ otId, presupuestos, hayLineas, totalActual, edita
               <li key={p.id} className={cx("rounded-xl border p-3", vigente ? "border-amber-200 bg-amber-50/40" : "border-slate-200")}>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-mono text-sm font-semibold">{p.numero}</span>
-                  {p.tipo === "complementario" && <Pastilla color="#7c3aed">Complementario</Pastilla>}
+                  {p.tipo === "complementario" && <Pastilla color="#7c3aed">Ampliación</Pastilla>}
                   <Pastilla color={e.c}>{e.t}</Pastilla>
-                  <span className="ml-auto text-lg font-bold tabular-nums">{fmtEuros(p.total)}</span>
+                  <span className="ml-auto text-right">
+                    <span className="block text-lg font-bold tabular-nums">{fmtEuros(p.total)}</span>
+                    {p.amplia && (
+                      <span className="block text-xs text-slate-500 tabular-nums">
+                        {p.total - p.amplia.total >= 0 ? "+" : "−"}{fmtEuros(Math.abs(p.total - p.amplia.total))} sobre {p.amplia.numero}
+                      </span>
+                    )}
+                  </span>
                 </div>
+                {(fmtHoras(p.horasEstimadas) || p.fechaEntrega) && (
+                  <p className="text-sm text-slate-600">
+                    {[fmtHoras(p.horasEstimadas) && `${p.amplia ? "Tiempo de más" : "Tiempo estimado"}: ${fmtHoras(p.horasEstimadas)}`, p.fechaEntrega && `${p.amplia ? "nueva entrega" : "entrega"} ${fmtFecha(p.fechaEntrega)}`].filter(Boolean).join(" · ")}
+                  </p>
+                )}
                 <p className="mt-1 text-sm text-slate-600">
                   {p.estado === "aprobado"
                     ? `Aceptado el ${fmtFecha(p.decididoEn)}${p.decididoNombre ? ` por ${p.decididoNombre}` : ""} (${VIA[p.decididoVia ?? "manual"]}${p.decisionNota ? `: ${p.decisionNota}` : ""})`
@@ -145,6 +175,11 @@ export function Presupuestos({ otId, presupuestos, hayLineas, totalActual, edita
                       </button>
                     </>
                   )}
+                  {editable && (p.estado === "pendiente" || p.estado === "sustituido") && (
+                    <button type="button" onClick={() => borrar(p)} disabled={pend} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-slate-500 hover:bg-red-50 hover:text-red-700">
+                      <Trash2 className="size-4" aria-hidden /> Borrar
+                    </button>
+                  )}
                 </div>
               </li>
             );
@@ -153,6 +188,28 @@ export function Presupuestos({ otId, presupuestos, hayLineas, totalActual, edita
       )}
 
       {error && <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+      <Dialogo
+        abierto={creando}
+        onCerrar={() => setCreando(false)}
+        titulo={ultimoAprobado ? `Ampliación del presupuesto ${ultimoAprobado.numero}` : "Nuevo presupuesto"}
+        descripcion={
+          ultimoAprobado
+            ? `Ya aceptado: ${fmtEuros(ultimoAprobado.total)}. Nuevo total: ${fmtEuros(totalActual)} (${totalActual - ultimoAprobado.total >= 0 ? "+" : "−"}${fmtEuros(Math.abs(totalActual - ultimoAprobado.total))}). El cliente verá solo lo que cambia y la diferencia.`
+            : `Total: ${fmtEuros(totalActual)}. Dile al cliente cuánto tiempo lleva y cuándo estará.`
+        }
+      >
+        {creando && (
+          <FormCrear
+            otId={otId}
+            ampliacion={!!ultimoAprobado}
+            sustituye={pendiente?.numero ?? null}
+            horas={horasSugeridas}
+            fecha={fechaPrevista}
+            onHecho={() => setCreando(false)}
+          />
+        )}
+      </Dialogo>
 
       <Dialogo
         abierto={!!dialogo}
@@ -203,6 +260,51 @@ function FormDecision({ tipo, presupuestoId, cliente, onHecho }: { tipo: "aproba
       <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
         <Boton type="button" variante="fantasma" onClick={onHecho}>Cancelar</Boton>
         <Boton type="submit" disabled={pend}>{pend && <Loader2 className="size-4 animate-spin" aria-hidden />} {tipo === "aprobar" ? "Marcar como aprobado" : "Marcar como no aceptado"}</Boton>
+      </div>
+    </form>
+  );
+}
+
+const aTexto = (h: number) => (h > 0 ? String(Math.round(h * 100) / 100).replace(".", ",") : "");
+
+function FormCrear({ otId, ampliacion, sustituye, horas, fecha, onHecho }: {
+  otId: string;
+  ampliacion: boolean;
+  sustituye: string | null;
+  horas: number;
+  fecha: string | null;
+  onHecho: () => void;
+}) {
+  const [h, setH] = useState(aTexto(horas));
+  const [f, setF] = useState(fecha && fecha >= diaISO() ? fecha : "");
+  const [error, setError] = useState("");
+  const [pend, start] = useTransition();
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        start(async () => {
+          setError("");
+          const r = await crearPresupuesto(otId, { horas: h, fecha: f });
+          if (r.error) setError(r.error);
+          else onHecho();
+        });
+      }}
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Campo etiqueta={ampliacion ? "Tiempo de más (horas)" : "Tiempo de trabajo (horas)"} ayuda="Calculado con la mano de obra. Puedes cambiarlo.">
+          <Input value={h} onChange={(e) => setH(e.target.value)} inputMode="decimal" placeholder="Ej.: 4" className="max-w-32 tabular-nums" />
+        </Campo>
+        <Campo etiqueta={ampliacion ? "Nueva fecha de entrega" : "Entrega prevista"} ayuda="Al aceptarlo pasa a la orden.">
+          <Input type="date" value={f} min={diaISO()} onChange={(e) => setF(e.target.value)} />
+        </Campo>
+      </div>
+      {sustituye && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">El presupuesto {sustituye} aún está pendiente: este lo sustituye.</p>}
+      {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+        <Boton type="button" variante="fantasma" onClick={onHecho}>Cancelar</Boton>
+        <Boton type="submit" disabled={pend}>{pend && <Loader2 className="size-4 animate-spin" aria-hidden />} {ampliacion ? "Crear ampliación" : "Crear presupuesto"}</Boton>
       </div>
     </form>
   );

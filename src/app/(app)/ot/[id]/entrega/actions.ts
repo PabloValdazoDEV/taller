@@ -12,6 +12,8 @@ import { TIPO_INCIDENCIA } from "@/lib/formato";
 import { fotosComoDataUrl, guardarDocumento, prepararEvidencia, tallerParaPdf, validarFirma } from "@/lib/pdf/generar";
 import { guardarFotos } from "@/lib/fotos";
 import { EntregaPdf } from "@/lib/pdf/plantillas";
+import { fmtEuros, ivaDeOT, totales } from "@/lib/importes";
+import { NOMBRE_METODO, resumenCobro } from "@/lib/cobros";
 
 class YaEntregada extends Error {}
 
@@ -38,6 +40,29 @@ export async function registrarEntrega(fd: FormData): Promise<{ error?: string }
   const km = fd.get("km") ? Number(fd.get("km")) : null;
   const piezas = String(fd.get("piezas") ?? "").trim() || null;
   const garantia = sinReparar !== null ? "" : String(fd.get("garantia") ?? "").trim();
+
+  // Orden proforma → cobro → firma: si hay importes en la app, la proforma debe estar al día;
+  // si el cliente no ha pagado su parte, hay que confirmar que se entrega con el cobro pendiente.
+  const tallerCfg = await tallerPorId(s.tid);
+  let importe: Parameters<typeof EntregaPdf>[0]["importe"] = null;
+  if (ot.lineas.length) {
+    const iva = ivaDeOT(ot.ot, ot.cliente, tallerCfg);
+    const total = totales(ot.lineas, iva.modo, iva.pct, iva.preciosConIva).total;
+    if (!ot.proforma) return { error: "Genera la proforma antes de entregar (paso 1)" };
+    if (ot.proforma.total !== total) return { error: "Los importes han cambiado: actualiza la proforma antes de entregar" };
+    const activos = ot.cobros.filter(({ c }) => !c.anuladoEn).map(({ c }) => c);
+    const r = resumenCobro(ot.proforma, activos);
+    if (r.cliente.pendiente > 0 && fd.get("sinCobrar") !== "1") return { error: `Falta cobrar ${fmtEuros(r.cliente.pendiente)} al cliente. Registra el cobro o marca que se entrega pendiente de cobro.` };
+    importe = {
+      proforma: ot.proforma.numero,
+      total: ot.proforma.total,
+      cliente: r.cliente.debe,
+      clientePagado: r.cliente.pagado,
+      compania: r.compania.debe,
+      companiaNombre: r.compania.nombre,
+      metodos: [...new Set(activos.filter((c) => c.pagador === "cliente").map((c) => NOMBRE_METODO[c.metodo]))].join(", "),
+    };
+  }
 
   const final = ot.estados.find((e) => e.marca === "final");
   if (!final) return { error: "El flujo no tiene estado final configurado" };
@@ -79,6 +104,7 @@ export async function registrarEntrega(fd: FormData): Promise<{ error?: string }
         totalFotosDespues: fotosDespues.length,
         firmaPng: firma,
         sinReparar,
+        importe,
       }),
     );
     // Solo cierra si sigue abierta (un doble envío no genera dos actas)

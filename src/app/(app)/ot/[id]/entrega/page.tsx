@@ -6,6 +6,10 @@ import { tallerPorId } from "@/lib/taller";
 import { Matricula, Tarjeta } from "@/components/ui";
 import { TIPO_INCIDENCIA } from "@/lib/formato";
 import { FormularioEntrega } from "./formulario";
+import { tiene } from "@/lib/puestos";
+import { fmtCantidad, ivaDeOT, totales } from "@/lib/importes";
+import { resumenCobro } from "@/lib/cobros";
+import { Cobros } from "../cobros";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +30,20 @@ export default async function Entrega({ params, searchParams }: { params: Promis
         ? `Antes de entregar, registra la devolución del coche de sustitución ${prestamoActivo.coche.matricula}.`
         : null;
   const incAbiertas = ot.incidencias.filter(({ i }) => i.estado === "abierta" || i.estado === "en_curso");
+
+  // Paso 1: importe y cobro (si la orden tiene importes en la app)
+  const iva = ivaDeOT(ot.ot, ot.cliente, taller);
+  const totalActual = totales(ot.lineas, iva.modo, iva.pct, iva.preciosConIva).total;
+  const cobros = ot.cobros.map(({ c, usuario }) => ({
+    id: c.id, pagador: c.pagador, metodo: c.metodo, importe: c.importe, nota: c.nota, fecha: c.fecha.toISOString(), usuario, anulado: !!c.anuladoEn,
+  }));
+  const conImportes = ot.lineas.length > 0;
+  const ultimoAceptado = ot.presupuestos.find((p) => p.estado === "aprobado");
+  const aceptado = ot.presupuestos.length ? { numero: ultimoAceptado?.numero ?? null, total: ultimoAceptado?.total ?? 0 } : null;
+  const resumen = ot.proforma ? resumenCobro(ot.proforma, ot.cobros.map(({ c }) => c)) : null;
+  const faltaProforma = !conImportes ? null : !ot.proforma ? "Genera la proforma (paso 1) antes de entregar." : ot.proforma.total !== totalActual ? "Los importes han cambiado: actualiza la proforma (paso 1)." : null;
+  // Las piezas presupuestadas se proponen como «piezas sustituidas»
+  const piezas = ot.lineas.filter((l) => l.tipo === "pieza").map((l) => (Number(l.cantidad) === 1 ? l.descripcion : `${l.descripcion} (${fmtCantidad(l.cantidad)})`)).join(", ");
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
@@ -51,14 +69,28 @@ export default async function Entrega({ params, searchParams }: { params: Promis
           Hay {incAbiertas.length} incidencia(s) sin cerrar: {incAbiertas.map(({ i }) => TIPO_INCIDENCIA[i.tipo]).join(", ")}. Revísalas antes de entregar.
         </Tarjeta>
       )}
+      {conImportes && tiene(s.puestos, "importes") && (
+        <Cobros
+          titulo="1. Importe y cobro"
+          otId={ot.ot.id}
+          proforma={ot.proforma ? { id: ot.proforma.id, numero: ot.proforma.numero, total: ot.proforma.total, reparto: ot.proforma.reparto, facturaExterna: ot.proforma.facturaExterna, creadoEn: ot.proforma.creadoEn.toISOString(), conformidadExceso: ot.proforma.conformidadExceso } : null}
+          cobros={cobros}
+          totalActual={totalActual}
+          hayLineas
+          abierta={!ot.ot.cerradaEn}
+          aceptado={aceptado}
+        />
+      )}
       <FormularioEntrega
+        piezas={piezas}
+        pendienteCliente={resumen?.cliente.pendiente ?? 0}
         otId={ot.ot.id}
         kmEntrada={ot.recepcion?.km ?? null}
         trabajoSugerido={sinReparar ? "" : ot.ot.trabajoSolicitado}
         sinReparar={sinReparar}
         garantia={taller.config.garantiaTexto ?? ""}
         firmante={ot.cliente.tipo === "particular" ? ot.cliente.nombre : ""}
-        bloqueo={bloqueo}
+        bloqueo={bloqueo ?? faltaProforma}
       />
     </div>
   );

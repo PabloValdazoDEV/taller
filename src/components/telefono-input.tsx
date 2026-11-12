@@ -7,7 +7,7 @@ import { Input, cx } from "./ui";
 
 /**
  * Teléfono con prefijo internacional (+34 por defecto). Guarda «+34 600 123 456».
- * El prefijo ocupa ~20 % (bandera + prefijo); al abrirlo se ve bandera, prefijo y país.
+ * El prefijo ocupa lo justo (bandera + prefijo, sin partirse); al abrirlo se ve bandera, prefijo y país.
  * Controlado (value/onChange) o para formularios (name + defaultValue).
  */
 export function TelefonoInput({
@@ -59,7 +59,7 @@ export function TelefonoInput({
 
   const sel = PREFIJOS.find((x) => x.p === pref);
   return (
-    <div ref={caja} className={cx("relative grid grid-cols-[minmax(5.5rem,20%)_minmax(0,1fr)] gap-2", className)}>
+    <div ref={caja} className={cx("relative grid grid-cols-[max-content_minmax(0,1fr)] gap-2", className)}>
       {name && <input type="hidden" name={name} value={unirTelefono(pref, numero)} />}
       <button
         type="button"
@@ -71,7 +71,7 @@ export function TelefonoInput({
         aria-haspopup="listbox"
         aria-expanded={abierto}
         className={cx(
-          "min-h-11 rounded-xl border bg-white px-2 flex items-center justify-center gap-1 text-base font-medium transition",
+          "min-h-11 whitespace-nowrap rounded-xl border bg-white px-2 flex items-center justify-center gap-1 text-base font-medium transition",
           abierto ? "border-primary ring-2 ring-primary/20" : "border-slate-300",
         )}
       >

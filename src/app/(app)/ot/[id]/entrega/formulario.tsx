@@ -7,9 +7,18 @@ import { PanelFirma } from "@/components/firma";
 import { FotosInput } from "@/components/fotos-input";
 import { KmInput } from "@/components/km-input";
 import { fmtKm } from "@/lib/formato";
+import { fmtEuros } from "@/lib/importes";
 import { registrarEntrega } from "./actions";
 
-export function FormularioEntrega(p: { otId: string; kmEntrada: number | null; trabajoSugerido: string; garantia: string; firmante: string; bloqueo: string | null; sinReparar?: boolean }) {
+export function FormularioEntrega(p: {
+  otId: string; kmEntrada: number | null; trabajoSugerido: string; garantia: string; firmante: string; bloqueo: string | null; sinReparar?: boolean;
+  /** Piezas presupuestadas, para proponerlas como sustituidas */
+  piezas?: string;
+  /** Lo que aún debe el cliente, en céntimos (0 = pagado o sin importes) */
+  pendienteCliente?: number;
+}) {
+  const [sinCobrar, setSinCobrar] = useState(false);
+  const debe = p.pendienteCliente ?? 0;
   const [firma, setFirma] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pend, start] = useTransition();
@@ -43,7 +52,7 @@ export function FormularioEntrega(p: { otId: string; kmEntrada: number | null; t
           <Textarea name="trabajos" rows={p.sinReparar ? 2 : 4} defaultValue={p.trabajoSugerido} required={!p.sinReparar} placeholder={p.sinReparar ? "Vacío = ninguna reparación" : undefined} />
         </Campo>
         <Campo etiqueta="Piezas sustituidas" ayuda="Las piezas sustituidas quedan a disposición del cliente.">
-          <Textarea name="piezas" rows={2} placeholder="Ej.: Pastillas de freno delanteras, filtro de aceite…" />
+          <Textarea name="piezas" rows={2} defaultValue={p.sinReparar ? "" : p.piezas} placeholder="Ej.: Pastillas de freno delanteras, filtro de aceite…" />
         </Campo>
         {!p.sinReparar && <Campo etiqueta="Garantía"><Input name="garantia" defaultValue={p.garantia} /></Campo>}
       </Tarjeta>
@@ -62,9 +71,17 @@ export function FormularioEntrega(p: { otId: string; kmEntrada: number | null; t
         <PanelFirma onChange={setFirma} etiqueta="Firma de conformidad" />
       </Tarjeta>
 
+      {debe > 0 && !p.bloqueo && (
+        <label className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <input type="checkbox" name="sinCobrar" value="1" checked={sinCobrar} onChange={(e) => setSinCobrar(e.target.checked)} className="mt-0.5 size-5 shrink-0" />
+          <span>
+            El cliente aún debe <b>{fmtEuros(debe)}</b>. Marca esta casilla solo si se entrega con el cobro pendiente (quedará anotado en el acta).
+          </span>
+        </label>
+      )}
       {(error || p.bloqueo) && <p className="rounded-xl bg-red-50 text-red-700 text-sm p-3" role="alert">{error || p.bloqueo}</p>}
       <div className="flex justify-end">
-        <Boton type="submit" variante="exito" className="min-h-12 px-6 text-base" disabled={pend || !firma || !!p.bloqueo}>
+        <Boton type="submit" variante="exito" className="min-h-12 px-6 text-base" disabled={pend || !firma || !!p.bloqueo || (debe > 0 && !sinCobrar)}>
           {pend ? <><Loader2 className="size-5 animate-spin" /> Generando acta…</> : <><Check className="size-5" /> {p.sinReparar ? "Firmar retirada sin reparar" : "Firmar y entregar"}</>}
         </Boton>
       </div>

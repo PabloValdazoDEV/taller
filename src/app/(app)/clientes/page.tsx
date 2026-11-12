@@ -7,6 +7,7 @@ import { fmtFecha } from "@/lib/formato";
 import { Matricula, Pastilla, Tarjeta, Vacio, cx } from "@/components/ui";
 import { LogoMarca } from "@/components/selector-marca-modelo";
 import { BuscadorClientes } from "./buscador";
+import { NuevaCompania } from "./nueva-compania";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,13 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Clientes</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Clientes</h1>
+          <p className="text-sm text-slate-500">Los particulares se dan de alta solos al recibir su coche. Las aseguradoras y flotas, aquí.</p>
+        </div>
+        <NuevaCompania />
+      </div>
       <div className="flex flex-wrap gap-3 items-center">
         <BuscadorClientes />
         <div className="flex flex-wrap gap-1.5">
@@ -54,10 +61,10 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold truncate">{c.nombre}</span>
                   {c.tipo !== "particular" && <Pastilla color="#475569">{NOMBRE_TIPO[c.tipo]}</Pastilla>}
-                  {c.abiertas > 0 && <Pastilla color="#c2410c">{c.abiertas} en taller</Pastilla>}
+                  {c.abiertas > 0 && <Pastilla color="#0f766e">{c.abiertas === 1 ? "1 coche en el taller" : `${c.abiertas} coches en el taller`}</Pastilla>}
                   {c.exentoIva && <Pastilla color="#0369a1">Exento IVA</Pastilla>}
                 </div>
-                <div className="text-xs text-slate-500 truncate">{[c.nif, c.telefono, c.email].filter(Boolean).join(" · ") || "Sin datos de contacto"}</div>
+                <div className="text-xs text-slate-500 truncate">{[c.nif && `NIF ${c.nif}`, c.telefono, c.email].filter(Boolean).join(" · ") || "Sin teléfono ni email"}</div>
                 {c.matriculas.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {c.matriculas.slice(0, 4).map((m, i) => (
@@ -71,7 +78,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
                 )}
               </div>
               <div className="hidden sm:block text-right text-xs text-slate-500 shrink-0">
-                <div><b className="text-slate-800">{c.ordenes}</b> órdenes</div>
+                <div><b className="text-slate-800">{c.ordenes}</b> {c.ordenes === 1 ? "orden" : "órdenes"} en total</div>
                 {c.ultimaVisita && <div>Última: {fmtFecha(c.ultimaVisita)}</div>}
               </div>
               <ChevronRight className="size-4 text-slate-300 shrink-0" />

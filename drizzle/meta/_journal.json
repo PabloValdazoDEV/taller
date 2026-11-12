@@ -64,6 +64,48 @@
       "when": 1794477164823,
       "tag": "0008_presupuestos",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794480751262,
+      "tag": "0009_proformas_cobros",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794482363841,
+      "tag": "0010_ampliaciones_recibos",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794486044122,
+      "tag": "0011_agenda_citas",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794494109141,
+      "tag": "0012_capacidad_taller",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794496251848,
+      "tag": "0013_especialidades_varias",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794496253761,
+      "tag": "0014_quitar_especialidad",
+      "breakpoints": true
     }
   ]
 }

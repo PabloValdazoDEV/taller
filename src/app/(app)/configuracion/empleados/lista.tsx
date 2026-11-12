@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { KeyRound, Loader2, Pencil, Plus, RotateCcw, UserX } from "lucide-react";
 import { Boton, Campo, Input, Pastilla, Tarjeta, cx } from "@/components/ui";
+import { ESPECIALIDADES, NOMBRE_ESPECIALIDAD, type Especialidad } from "@/lib/importes";
+import { DIAS_SEMANA, fmtH, nombreEspecialidades } from "@/lib/capacidad";
 import { Dialogo } from "@/components/dialogo";
 import { INFO_PUESTO, PUESTOS, longitudPin, type Puesto } from "@/lib/puestos";
 import type { Empleado } from "@/lib/data";
@@ -83,6 +85,11 @@ function FilaEmpleado({ e, yo, pendiente, onEditar, onActivo }: { e: Empleado; y
           {PUESTOS.filter((p) => e.puestos.includes(p)).map((p) => (
             <Pastilla key={p} className="bg-slate-100 text-slate-700">{INFO_PUESTO[p].nombre}</Pastilla>
           ))}
+          {e.puestos.includes("mecanico") && (
+            <span className="text-xs text-slate-500 self-center">
+              {nombreEspecialidades(e.especialidades)} · {fmtH(Number(e.horasDia))} h/día · {DIAS_SEMANA.filter((d) => e.diasTrabajo.includes(d.n)).map((d) => d.corto).join(" ")}
+            </span>
+          )}
           {e.trabajosAbiertos > 0 && <span className="text-xs text-slate-500 self-center">· {e.trabajosAbiertos} trabajo(s) abiertos</span>}
         </div>
       </div>
@@ -110,6 +117,8 @@ function FormEmpleado({ e, yo, onHecho }: { e: Empleado | null; yo: boolean; onH
   const [color, setColor] = useState(e?.color ?? COLORES[6]);
   const [puestos, setPuestos] = useState<Puesto[]>(e?.puestos ?? []);
   const [cambiarPin, setCambiarPin] = useState(!e);
+  const [dias, setDias] = useState<number[]>(e?.diasTrabajo ?? [1, 2, 3, 4, 5]);
+  const [esps, setEsps] = useState<Especialidad[]>(e?.especialidades.length ? e.especialidades : ["mecanica"]);
   // Dirección y jefe de taller llevan PIN de 6 cifras; si al cambiar de puestos cambia la longitud, hace falta uno nuevo
   const cifras = longitudPin(puestos);
   const cambiaLongitud = !!e && longitudPin(e.puestos) !== cifras;
@@ -160,6 +169,44 @@ function FormEmpleado({ e, yo, onHecho }: { e: Empleado | null; yo: boolean; onH
           })}
         </div>
       </fieldset>
+
+      {puestos.includes("mecanico") && (
+        <fieldset className="space-y-3 rounded-xl border border-slate-200 p-3">
+          <legend className="px-1 text-sm font-medium text-slate-700">Trabajo en el taller <span className="font-normal text-slate-500">(para saber si se da abasto al dar citas)</span></legend>
+          <div>
+            <p className="mb-1 text-sm text-slate-700">Especialidades <span className="text-slate-500">(puede tener varias: sus horas van a lo que más falte)</span></p>
+            <div className="flex flex-wrap gap-1.5">
+              {ESPECIALIDADES.map((x) => {
+                const on = esps.includes(x);
+                return (
+                  <label key={x} className={cx("inline-flex min-h-11 cursor-pointer items-center rounded-xl border-2 px-3 text-sm font-semibold", on ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600")}>
+                    <input type="checkbox" name="especialidades" value={x} checked={on} onChange={() => setEsps((v) => (on ? (v.length > 1 ? v.filter((y) => y !== x) : v) : [...v, x]))} className="sr-only" />
+                    {NOMBRE_ESPECIALIDAD[x]}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <Campo etiqueta="Horas de trabajo al día" ayuda="Horas que puede dedicar a los coches.">
+            <Input name="horasDia" defaultValue={e ? String(Number(e.horasDia)).replace(".", ",") : "8"} inputMode="decimal" maxLength={5} className="max-w-28" />
+          </Campo>
+          <div>
+            <p className="mb-1 text-sm text-slate-700">Días que trabaja</p>
+            <input type="hidden" name="diasTrabajoEnviado" value="1" />
+            <div className="flex flex-wrap gap-1.5">
+              {DIAS_SEMANA.map((d) => {
+                const on = dias.includes(d.n);
+                return (
+                  <label key={d.n} title={d.nombre} className={cx("grid size-11 cursor-pointer place-items-center rounded-xl border-2 text-sm font-semibold", on ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600")}>
+                    <input type="checkbox" name="diasTrabajo" value={d.n} checked={on} onChange={() => setDias((v) => (on ? v.filter((x) => x !== d.n) : [...v, d.n]))} className="sr-only" aria-label={d.nombre} />
+                    {d.corto}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </fieldset>
+      )}
 
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-slate-700">Color <span className="font-normal text-slate-500">(para reconocerle en el tablero)</span></legend>

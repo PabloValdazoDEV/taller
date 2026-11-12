@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Dano, DatosSiniestro, LineaPresupuesto } from "@/db/schema";
 import { ESTILOS, VISTAS, vistaDe, zonaDano, type DefVista, type Forma } from "@/lib/silueta";
 import { fmtCombustible, fmtFecha, fmtFechaHora, fmtKm, fmtMiles } from "@/lib/formato";
+import { fmtHoras, type Cambio } from "@/lib/ampliacion";
 
 const C = { texto: "#0f172a", suave: "#64748b", borde: "#cbd5e1", fondo: "#f1f5f9" };
 
@@ -238,7 +239,7 @@ export function ResguardoPdf(d: DatosResguardo) {
         <View style={st.caja}><Text>{d.trabajoSolicitado}</Text></View>
         <View style={[st.fila, { marginTop: 4 }]}>
           <View style={st.col}><Dato et="Recepción" val={fmtFechaHora(d.fechaEntrada)} /><Dato et="Entrega prevista" val={fmtFecha(d.fechaPrevista)} /></View>
-          <View style={st.col}><Dato et="Presupuesto" val={d.renunciaPresupuesto ? "El cliente RENUNCIA expresamente a presupuesto previo" : "Se facilitará presupuesto antes de reparar"} /></View>
+          <View style={st.col}><Dato et="Presupuesto" val={d.renunciaPresupuesto ? "El cliente AUTORIZA la reparación sin presupuesto previo" : "Se facilitará presupuesto antes de reparar"} /></View>
         </View>
       </Seccion>
       <Seccion titulo="Estado del vehículo a la entrada">
@@ -287,6 +288,8 @@ export type DatosEntrega = {
   fotosDespues: string[];
   totalFotosDespues: number;
   firmaPng: string;
+  /** Importe según la proforma y lo cobrado al entregar (si la orden tiene importes en la app) */
+  importe?: { proforma: string; total: number; cliente: number; clientePagado: number; compania: number; companiaNombre: string | null; metodos: string } | null;
 };
 
 export function EntregaPdf(d: DatosEntrega) {
@@ -317,6 +320,16 @@ export function EntregaPdf(d: DatosEntrega) {
         <Seccion titulo="Piezas sustituidas">
           <Text>{d.piezasSustituidas}</Text>
           <Text style={[st.suave, { fontSize: 7 }]}>Las piezas sustituidas están a disposición del cliente si las solicita.</Text>
+        </Seccion>
+      )}
+      {d.importe && (
+        <Seccion titulo="Importe">
+          <Dato et="Total" val={`${eur(d.importe.total)} (proforma ${d.importe.proforma}; la factura se emite por separado)`} />
+          <Dato
+            et="Cliente"
+            val={`${eur(d.importe.cliente)} · ${d.importe.clientePagado >= d.importe.cliente ? `pagado${d.importe.metodos ? ` (${d.importe.metodos})` : ""}` : `pagado ${eur(d.importe.clientePagado)}, PENDIENTE ${eur(d.importe.cliente - d.importe.clientePagado)}`}`}
+          />
+          {d.importe.companiaNombre && <Dato et="A cargo de" val={`${d.importe.companiaNombre}: ${eur(d.importe.compania)}`} />}
         </Seccion>
       )}
       {d.incidencias.length > 0 && (
@@ -432,6 +445,10 @@ export type DatosPresupuesto = {
   cliente: Cli;
   vehiculo: Veh;
   trabajoSolicitado: string;
+  /** Ampliación: presupuesto aceptado al que amplía y qué cambia */
+  ampliacion?: { numero: string; total: number; cambios: Cambio[] } | null;
+  horasEstimadas?: string | null;
+  fechaEntrega?: string | null;
   lineas: LineaPresupuesto[];
   modo: "con_iva" | "exento";
   pct: string;
@@ -466,12 +483,109 @@ const tb = StyleSheet.create({
   totVal: { width: 70, textAlign: "right" },
 });
 
+type Importes = Pick<DatosPresupuesto, "lineas" | "modo" | "pct" | "motivoExencion" | "preciosConIva" | "base" | "iva" | "total">;
+
+/** Tabla de líneas con base, IVA y total (o total exento con su motivo). La usan el presupuesto y la proforma. */
+function TablaImportes({ d, titulo = "Detalle" }: { d: Importes; titulo?: string }) {
+  return (
+    <View style={st.seccion}>
+      <Text style={st.seccionTitulo}>{titulo}{d.modo === "con_iva" ? (d.preciosConIva ? " (precios con IVA incluido)" : " (precios sin IVA)") : ""}</Text>
+      <View style={tb.cab} fixed>
+        <Text style={tb.concepto}>Concepto</Text>
+        <Text style={tb.num}>Cantidad</Text>
+        <Text style={tb.num}>Precio</Text>
+        <Text style={tb.dto}>Dto.</Text>
+        <Text style={tb.imp}>Importe</Text>
+      </View>
+      {d.lineas.map((l, i) => (
+        <View key={i} style={tb.fila} wrap={false}>
+          <View style={tb.concepto}>
+            <Text>{l.descripcion}</Text>
+            {(l.referencia || (l.tipo === "mano_obra" && l.especialidad)) && (
+              <Text style={[st.suave, { fontSize: 7.5 }]}>
+                {[l.tipo === "mano_obra" && l.especialidad ? `Mano de obra ${ESP[l.especialidad] ?? l.especialidad}` : null, l.referencia ? `Ref. ${l.referencia}` : null].filter(Boolean).join(" · ")}
+              </Text>
+            )}
+          </View>
+          <Text style={tb.num}>{cant(l.cantidad)}{l.tipo === "mano_obra" ? " h" : ""}</Text>
+          <Text style={tb.num}>{precioPdf(l.precio)}</Text>
+          <Text style={tb.dto}>{Number(l.descuento) > 0 ? `${cant(l.descuento)} %` : ""}</Text>
+          <Text style={tb.imp}>{eur(l.importe)}</Text>
+        </View>
+      ))}
+      <View style={{ marginTop: 6 }} wrap={false}>
+        {d.modo === "con_iva" ? (
+          <>
+            <View style={tb.tot}><Text style={tb.totEt}>Base imponible</Text><Text style={tb.totVal}>{eur(d.base)}</Text></View>
+            <View style={tb.tot}><Text style={tb.totEt}>IVA ({cant(d.pct)} %)</Text><Text style={tb.totVal}>{eur(d.iva)}</Text></View>
+            <View style={[tb.tot, { borderTopWidth: 1, borderTopColor: C.texto, marginTop: 2, paddingTop: 3 }]}>
+              <Text style={[tb.totEt, { color: C.texto, fontFamily: "Helvetica-Bold" }]}>TOTAL</Text>
+              <Text style={[tb.totVal, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>{eur(d.total)}</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={[tb.tot, { borderTopWidth: 1, borderTopColor: C.texto, paddingTop: 3 }]}>
+              <Text style={[tb.totEt, { color: C.texto, fontFamily: "Helvetica-Bold" }]}>TOTAL (exento de IVA)</Text>
+              <Text style={[tb.totVal, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>{eur(d.total)}</Text>
+            </View>
+            <Text style={[st.suave, { textAlign: "right", marginTop: 2 }]}>Operación exenta de IVA{d.motivoExencion ? `: ${d.motivoExencion}` : ""}</Text>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const ETQ_CAMBIO = { nueva: "Nuevo", cambia: "Cambia", quita: "Se quita" } as const;
+
+/** Qué añade o cambia una ampliación respecto al presupuesto ya aceptado, y la diferencia. */
+function Ampliacion({ a, total, ivaPct }: { a: NonNullable<DatosPresupuesto["ampliacion"]>; total: number; ivaPct: string | null }) {
+  const dif = total - a.total;
+  const difLinea = (c: Cambio) => (c.tipo === "nueva" ? c.linea.importe : c.tipo === "quita" ? -c.linea.importe : c.linea.importe - (c.antes?.importe ?? 0));
+  // Precios sin IVA: las líneas van sin IVA y el IVA de la diferencia aparte, para que cuadre
+  const ivaDif = ivaPct ? dif - a.cambios.reduce((s, c) => s + difLinea(c), 0) : 0;
+  return (
+    <View style={[st.seccion, { borderWidth: 1, borderColor: C.texto, borderRadius: 3, padding: 6 }]} wrap={false}>
+      <Text style={st.seccionTitulo}>Ampliación del presupuesto {a.numero} ya aceptado</Text>
+      {a.cambios.map((c, i) => {
+        const d = difLinea(c);
+        return (
+          <View key={i} style={tb.fila}>
+            <Text style={{ width: 46, fontFamily: "Helvetica-Bold" }}>{ETQ_CAMBIO[c.tipo]}</Text>
+            <View style={tb.concepto}>
+              <Text>{c.linea.descripcion}</Text>
+              {c.tipo === "cambia" && c.antes && (
+                <Text style={[st.suave, { fontSize: 7.5 }]}>Antes: {cant(c.antes.cantidad)}{c.antes.tipo === "mano_obra" ? " h" : ""} × {precioPdf(c.antes.precio)} = {eur(c.antes.importe)} · ahora {cant(c.linea.cantidad)}{c.linea.tipo === "mano_obra" ? " h" : ""} × {precioPdf(c.linea.precio)}</Text>
+              )}
+              {c.tipo === "nueva" && <Text style={[st.suave, { fontSize: 7.5 }]}>{cant(c.linea.cantidad)}{c.linea.tipo === "mano_obra" ? " h" : ""} × {precioPdf(c.linea.precio)}</Text>}
+            </View>
+            <Text style={tb.imp}>{d >= 0 ? "+" : ""}{eur(d)}</Text>
+          </View>
+        );
+      })}
+      {ivaPct && ivaDif !== 0 && (
+        <View style={tb.fila}>
+          <Text style={{ width: 46 }} />
+          <Text style={[tb.concepto, st.suave]}>IVA ({cant(ivaPct)} %)</Text>
+          <Text style={tb.imp}>{ivaDif >= 0 ? "+" : ""}{eur(ivaDif)}</Text>
+        </View>
+      )}
+      <View style={{ marginTop: 4 }}>
+        <View style={tb.tot}><Text style={tb.totEt}>Ya aceptado ({a.numero})</Text><Text style={tb.totVal}>{eur(a.total)}</Text></View>
+        <View style={tb.tot}><Text style={[tb.totEt, { color: C.texto, fontFamily: "Helvetica-Bold" }]}>Ampliación</Text><Text style={[tb.totVal, { fontFamily: "Helvetica-Bold" }]}>{dif >= 0 ? "+" : ""}{eur(dif)}</Text></View>
+        <View style={tb.tot}><Text style={tb.totEt}>Nuevo total</Text><Text style={tb.totVal}>{eur(total)}</Text></View>
+      </View>
+    </View>
+  );
+}
+
 export function PresupuestoPdf(d: DatosPresupuesto) {
   const firmado = !!(d.evidencia && d.firmaPng);
   return (
     <Marco
       taller={d.taller}
-      titulo={d.tipo === "complementario" ? "PRESUPUESTO COMPLEMENTARIO" : "PRESUPUESTO"}
+      titulo={d.tipo === "complementario" ? "AMPLIACIÓN DE PRESUPUESTO" : "PRESUPUESTO"}
       subtitulo={`Nº ${d.numero} · Orden ${d.numeroOT}`}
       evidencia={d.evidencia}
       pie={`Presupuesto ${d.numero} · Emitido el ${fmtFecha(d.creadoEn)} · Válido hasta el ${fmtFecha(d.validezHasta)}${d.situacion ? ` · ${d.situacion}` : " · Pendiente de aceptación"}`}
@@ -482,52 +596,14 @@ export function PresupuestoPdf(d: DatosPresupuesto) {
           <View style={st.caja}><Text>{d.trabajoSolicitado}</Text></View>
         </Seccion>
       )}
-      <View style={st.seccion}>
-        <Text style={st.seccionTitulo}>Detalle{d.modo === "con_iva" ? (d.preciosConIva ? " (precios con IVA incluido)" : " (precios sin IVA)") : ""}</Text>
-        <View style={tb.cab} fixed>
-          <Text style={tb.concepto}>Concepto</Text>
-          <Text style={tb.num}>Cantidad</Text>
-          <Text style={tb.num}>Precio</Text>
-          <Text style={tb.dto}>Dto.</Text>
-          <Text style={tb.imp}>Importe</Text>
-        </View>
-        {d.lineas.map((l, i) => (
-          <View key={i} style={tb.fila} wrap={false}>
-            <View style={tb.concepto}>
-              <Text>{l.descripcion}</Text>
-              {(l.referencia || (l.tipo === "mano_obra" && l.especialidad)) && (
-                <Text style={[st.suave, { fontSize: 7.5 }]}>
-                  {[l.tipo === "mano_obra" && l.especialidad ? `Mano de obra ${ESP[l.especialidad] ?? l.especialidad}` : null, l.referencia ? `Ref. ${l.referencia}` : null].filter(Boolean).join(" · ")}
-                </Text>
-              )}
-            </View>
-            <Text style={tb.num}>{cant(l.cantidad)}{l.tipo === "mano_obra" ? " h" : ""}</Text>
-            <Text style={tb.num}>{precioPdf(l.precio)}</Text>
-            <Text style={tb.dto}>{Number(l.descuento) > 0 ? `${cant(l.descuento)} %` : ""}</Text>
-            <Text style={tb.imp}>{eur(l.importe)}</Text>
-          </View>
-        ))}
-        <View style={{ marginTop: 6 }} wrap={false}>
-          {d.modo === "con_iva" ? (
-            <>
-              <View style={tb.tot}><Text style={tb.totEt}>Base imponible</Text><Text style={tb.totVal}>{eur(d.base)}</Text></View>
-              <View style={tb.tot}><Text style={tb.totEt}>IVA ({cant(d.pct)} %)</Text><Text style={tb.totVal}>{eur(d.iva)}</Text></View>
-              <View style={[tb.tot, { borderTopWidth: 1, borderTopColor: C.texto, marginTop: 2, paddingTop: 3 }]}>
-                <Text style={[tb.totEt, { color: C.texto, fontFamily: "Helvetica-Bold" }]}>TOTAL</Text>
-                <Text style={[tb.totVal, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>{eur(d.total)}</Text>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={[tb.tot, { borderTopWidth: 1, borderTopColor: C.texto, paddingTop: 3 }]}>
-                <Text style={[tb.totEt, { color: C.texto, fontFamily: "Helvetica-Bold" }]}>TOTAL (exento de IVA)</Text>
-                <Text style={[tb.totVal, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>{eur(d.total)}</Text>
-              </View>
-              <Text style={[st.suave, { textAlign: "right", marginTop: 2 }]}>Operación exenta de IVA{d.motivoExencion ? `: ${d.motivoExencion}` : ""}</Text>
-            </>
-          )}
-        </View>
-      </View>
+      {d.ampliacion && <Ampliacion a={d.ampliacion} total={d.total} ivaPct={d.modo === "con_iva" && !d.preciosConIva ? d.pct : null} />}
+      <TablaImportes d={d} titulo={d.ampliacion ? "Detalle completo con la ampliación" : undefined} />
+      {(fmtHoras(d.horasEstimadas) || d.fechaEntrega) && (
+        <Seccion titulo="Plazo">
+          {fmtHoras(d.horasEstimadas) && <Dato et={d.ampliacion ? "Tiempo de más" : "Tiempo estimado"} val={`${fmtHoras(d.horasEstimadas)} de trabajo`} />}
+          {d.fechaEntrega && <Dato et={d.ampliacion ? "Nueva entrega" : "Entrega prevista"} val={fmtFecha(d.fechaEntrega)} />}
+        </Seccion>
+      )}
       <Seccion titulo="Validez">
         <Text>Este presupuesto es válido hasta el {fmtFecha(d.validezHasta)}.{d.situacion ? ` ${d.situacion}.` : ""}</Text>
       </Seccion>
@@ -535,6 +611,128 @@ export function PresupuestoPdf(d: DatosPresupuesto) {
       {firmado && (
         <Firmas sello={d.taller.sello} firmaPng={d.firmaPng!} firmante={d.evidencia!.firmante} empleado={d.evidencia!.atendidoPor} etiquetaCliente="Acepto el presupuesto (cliente)" />
       )}
+    </Marco>
+  );
+}
+
+// ───────────────────────── Proforma (no es factura) ─────────────────────────
+
+export type DatosProforma = Importes & {
+  taller: TallerPdf;
+  numero: string;
+  numeroOT: string;
+  creadoEn: Date;
+  cliente: Cli;
+  vehiculo: Veh;
+  reparto: { cliente: number; compania: number; companiaNombre: string | null };
+  cobros: { fecha: Date; pagador: "cliente" | "compania"; metodo: string; importe: number }[];
+  facturaExterna: string | null;
+};
+
+const METODO_PDF: Record<string, string> = { efectivo: "Efectivo", tarjeta: "Tarjeta", transferencia: "Transferencia", bizum: "Bizum" };
+
+export function ProformaPdf(d: DatosProforma) {
+  const pagado = (q: "cliente" | "compania") => d.cobros.filter((c) => c.pagador === q).reduce((s, c) => s + c.importe, 0);
+  const partes = [
+    { quien: "Cliente", debe: d.reparto.cliente, pagado: pagado("cliente") },
+    ...(d.reparto.companiaNombre ? [{ quien: d.reparto.companiaNombre, debe: d.reparto.compania, pagado: pagado("compania") }] : []),
+  ];
+  return (
+    <Marco
+      taller={d.taller}
+      titulo="PROFORMA"
+      subtitulo={`Nº ${d.numero} · Orden ${d.numeroOT}`}
+      pie={`Proforma ${d.numero} del ${fmtFecha(d.creadoEn)} · Documento informativo: NO ES FACTURA`}
+    >
+      <View style={[st.caja, { marginBottom: 10, borderWidth: 1, borderColor: C.texto }]}>
+        <Text style={{ fontFamily: "Helvetica-Bold", textAlign: "center" }}>DOCUMENTO INFORMATIVO · NO ES FACTURA</Text>
+        <Text style={[st.suave, { textAlign: "center" }]}>
+          {d.facturaExterna ? `Factura correspondiente: nº ${d.facturaExterna}.` : "La factura se emitirá por separado."}
+        </Text>
+      </View>
+      <ClienteVehiculo cliente={d.cliente} vehiculo={d.vehiculo} />
+      <TablaImportes d={d} />
+      <Seccion titulo="Pago">
+        {partes.map((p) => (
+          <View key={p.quien} style={tb.tot}>
+            <Text style={[tb.totEt, { width: 230 }]}>{p.quien}: {eur(p.debe)}{p.pagado > 0 ? ` · pagado ${eur(p.pagado)}` : ""}</Text>
+            <Text style={[tb.totVal, { fontFamily: "Helvetica-Bold" }]}>{p.debe - p.pagado > 0 ? `Pendiente ${eur(p.debe - p.pagado)}` : "Pagado"}</Text>
+          </View>
+        ))}
+        {d.cobros.length > 0 && (
+          <View style={{ marginTop: 4 }}>
+            {d.cobros.map((c, i) => (
+              <Text key={i} style={st.suave}>
+                {fmtFechaHora(c.fecha)} · {METODO_PDF[c.metodo] ?? c.metodo} · {c.pagador === "cliente" ? "Cliente" : d.reparto.companiaNombre} · {eur(c.importe)}
+              </Text>
+            ))}
+          </View>
+        )}
+      </Seccion>
+    </Marco>
+  );
+}
+
+// ───────────────────────── Recibo (justificante de pago, no es factura) ─────────────────────────
+
+export type DatosRecibo = DatosProforma & { emitidoPor: string | null };
+
+/**
+ * Recibo rápido para el cliente: qué se le ha hecho (trabajos y piezas con su importe), el subtotal
+ * con o sin IVA según la orden, y lo que ha pagado. Sin datos fiscales del cliente: NO es factura.
+ */
+export function ReciboPdf(d: DatosRecibo) {
+  const pagosCliente = d.cobros.filter((c) => c.pagador === "cliente");
+  const pagado = pagosCliente.reduce((s, c) => s + c.importe, 0);
+  const pendiente = Math.max(0, d.reparto.cliente - pagado);
+  const hoy = new Date();
+  return (
+    <Marco
+      taller={d.taller}
+      titulo="RECIBO"
+      subtitulo={`Orden ${d.numeroOT} · ${fmtFecha(hoy)}`}
+      pie={`Recibo de la orden ${d.numeroOT} · Justificante de pago: no es factura${d.facturaExterna ? ` · Factura nº ${d.facturaExterna}` : ""}`}
+    >
+      <View style={[st.fila, { marginBottom: 10 }]}>
+        <View style={st.col}>
+          <Dato et="Cliente" val={d.cliente.nombre} />
+        </View>
+        <View style={st.col}>
+          <Dato et="Vehículo" val={`${d.vehiculo.matricula}${d.vehiculo.marca ? ` · ${[d.vehiculo.marca, d.vehiculo.modelo].filter(Boolean).join(" ")}` : ""}`} />
+        </View>
+      </View>
+      <TablaImportes d={d} titulo="Trabajos y piezas" />
+      <Seccion titulo="Pago">
+        {d.reparto.companiaNombre && (
+          <View style={tb.tot}><Text style={[tb.totEt, { width: 230 }]}>A cargo de {d.reparto.companiaNombre}</Text><Text style={tb.totVal}>{eur(d.reparto.compania)}</Text></View>
+        )}
+        <View style={tb.tot}><Text style={[tb.totEt, { width: 230 }]}>A cargo del cliente</Text><Text style={tb.totVal}>{eur(d.reparto.cliente)}</Text></View>
+        {pagosCliente.map((c, i) => (
+          <View key={i} style={tb.tot}>
+            <Text style={[tb.totEt, { width: 230 }]}>Pagado {fmtFecha(c.fecha)} · {METODO_PDF[c.metodo] ?? c.metodo}</Text>
+            <Text style={tb.totVal}>{eur(c.importe)}</Text>
+          </View>
+        ))}
+        <View style={[tb.tot, { borderTopWidth: 1, borderTopColor: C.texto, marginTop: 2, paddingTop: 3 }]}>
+          <Text style={[tb.totEt, { width: 230, color: C.texto, fontFamily: "Helvetica-Bold" }]}>{pendiente > 0 ? "Pendiente de pago" : "Pagado"}</Text>
+          <Text style={[tb.totVal, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>{eur(pendiente > 0 ? pendiente : pagado)}</Text>
+        </View>
+      </Seccion>
+      {pagado > 0 && (
+        <View style={[st.firmas, { marginTop: 4 }]} wrap={false}>
+          <View style={{ flex: 1 }}>
+            <Text>Recibí de {d.cliente.nombre} la cantidad de {eur(pagado)} por los trabajos detallados.</Text>
+            <Text style={[st.suave, { marginTop: 3 }]}>{d.emitidoPor ? `Atendido por ${d.emitidoPor}` : ""}</Text>
+          </View>
+          <View style={[st.firmaCaja, { flexGrow: 0, flexShrink: 0, flexBasis: 170 }]}>
+            <Text style={st.suave}>Por el taller</Text>
+            {d.taller.sello ? <Image src={d.taller.sello} style={{ height: 62, objectFit: "contain" }} /> : <View style={{ height: 62 }} />}
+          </View>
+        </View>
+      )}
+      <Text style={st.legal}>
+        Este recibo justifica el pago y detalla los trabajos realizados. No es una factura{d.facturaExterna ? `: la factura correspondiente es la nº ${d.facturaExterna}` : ": la factura se emite aparte"}.
+      </Text>
     </Marco>
   );
 }

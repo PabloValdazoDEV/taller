@@ -158,7 +158,9 @@ Arquitectura de **canales desacoplados**: la app genera un evento (por ejemplo, 
 - **IVA**: por defecto el general; el cliente o el documento pueden marcarse como **exento**, con su motivo legal, que aparece en el documento.
 - **Presupuesto**: copia inmutable de las líneas (nº `<OT>-P<n>`, válido 12 días hábiles). Aceptación con firma en la tablet, por enlace en el móvil del cliente (nombre + firma) o registrada por la oficina sin firma (teléfono/aseguradora/perito, con nota). Con firma se archiva el PDF con su SHA-256. Si la orden está «pendiente de aprobación», avanza sola al aceptarse.
 - **Varios pagadores**: en los siniestros, el importe se reparte entre el **cliente (franquicia)** y la **aseguradora** (resto).
-- **Cobros**: efectivo, tarjeta (solo se registra; sin integración con el datáfono) o pendiente de la aseguradora/flota. Estado: pendiente / parcial / cobrado.
+- **Cobros**: efectivo, tarjeta (solo se registra; sin integración con el datáfono), transferencia o Bizum, del cliente o de la compañía. Estado: pendiente / parcial / cobrado. Un cobro erróneo se anula (no se borra).
+- **Proforma**: copia de las líneas al cobrar, con el reparto entre pagadores; documento informativo «NO ES FACTURA». Se puede apuntar el nº de la factura emitida en el programa de facturación.
+- **Entrega**: proforma → cobro → firma. Si el cliente no paga en el momento, se confirma expresamente y el acta lo indica.
 - **Exportación** de proformas y cobros a Excel/CSV para el programa de facturación externo. Su integración por API llegará en una fase posterior, cuando se sepa qué programa es.
 
 ---

@@ -7,7 +7,7 @@ import { PanelFirma } from "@/components/firma";
 import { aceptarPorEnlace, rechazarPorEnlace } from "../actions";
 
 /** Aceptar (nombre + firma) o no aceptar el presupuesto desde el móvil del cliente. */
-export function DecisionCliente({ token, nombre }: { token: string; nombre: string }) {
+export function DecisionCliente({ token, nombre, ampliacion = false }: { token: string; nombre: string; ampliacion?: boolean }) {
   const [firmante, setFirmante] = useState(nombre);
   const [firma, setFirma] = useState<string | null>(null);
   const [conforme, setConforme] = useState(false);
@@ -25,7 +25,7 @@ export function DecisionCliente({ token, nombre }: { token: string; nombre: stri
 
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6" aria-labelledby="h-decision">
-      <h2 id="h-decision" className="text-lg font-semibold">¿Acepta el presupuesto?</h2>
+      <h2 id="h-decision" className="text-lg font-semibold">{ampliacion ? "¿Acepta la ampliación?" : "¿Acepta el presupuesto?"}</h2>
       {rechazando ? (
         <>
           <Campo etiqueta="Si quiere, díganos el motivo (opcional)"><Input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej.: Prefiero pensarlo" /></Campo>
@@ -43,7 +43,7 @@ export function DecisionCliente({ token, nombre }: { token: string; nombre: stri
           <PanelFirma onChange={setFirma} etiqueta="Su firma" />
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" className="mt-0.5 size-5 shrink-0" checked={conforme} onChange={(e) => setConforme(e.target.checked)} />
-            <span>He leído el presupuesto y autorizo la reparación por el importe indicado.</span>
+            <span>{ampliacion ? "He leído la ampliación y autorizo los trabajos añadidos por el nuevo importe total." : "He leído el presupuesto y autorizo la reparación por el importe indicado."}</span>
           </label>
           {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           <div className="flex flex-wrap justify-between gap-2">

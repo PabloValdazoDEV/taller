@@ -267,7 +267,7 @@ function FormExento({ motivo, onGuardar, pendiente, error }: { motivo: string; o
         onGuardar(m);
       }}
     >
-      <Campo etiqueta="Motivo legal de la exención" ayuda="Por ejemplo, el artículo de la Ley del IVA que aplica. Si el cliente es siempre exento, ponlo en su ficha y saldrá solo.">
+      <Campo etiqueta="Motivo legal de la exención" ayuda="Obligatorio: si no se cobra IVA, el documento tiene que decir por qué (lo exige la ley). La frase exacta os la da la gestoría. Si un cliente está siempre exento, ponlo en su ficha y saldrá solo.">
         <Input value={m} onChange={(e) => setM(e.target.value)} required minLength={5} autoFocus />
       </Campo>
       {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

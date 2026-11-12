@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db, t } from "@/db";
@@ -9,15 +9,26 @@ import { requireSesion } from "@/lib/auth";
 import { auditar } from "@/lib/auditoria";
 import { tallerPorId } from "@/lib/taller";
 import { diaISO } from "@/lib/formato";
-import { importeLinea, ivaDeOT, totales } from "@/lib/importes";
+import { importeLinea, ivaDeOT, leerDecimal, totales } from "@/lib/importes";
+import { cambiosAmpliacion } from "@/lib/ampliacion";
 import { DIAS_HABILES_VALIDEZ, decidirPresupuesto, sumarDiasHabiles } from "@/lib/presupuestos";
 import { validarFirma } from "@/lib/pdf/generar";
 
 type R = { error?: string };
 
-/** Crea un presupuesto con las líneas actuales de la orden. Sustituye al que estuviera pendiente. */
-export async function crearPresupuesto(otId: string): Promise<R & { id?: string }> {
+/**
+ * Crea un presupuesto con las líneas actuales de la orden. Sustituye al que estuviera pendiente.
+ * Si ya hay uno aceptado, es una ampliación (complementario): se enseña qué cambia respecto a él.
+ * `horas`: tiempo de trabajo estimado (en una ampliación, el de más); `fecha`: entrega prevista (AAAA-MM-DD).
+ */
+export async function crearPresupuesto(otId: string, opts: { horas?: string; fecha?: string } = {}): Promise<R & { id?: string }> {
   const s = await requireSesion("importes");
+  const horasTxt = (opts.horas ?? "").trim();
+  const horas = horasTxt ? leerDecimal(horasTxt) : null;
+  if (horas !== null && (!Number.isFinite(horas) || horas < 0 || horas > 9999)) return { error: "Tiempo estimado no válido" };
+  const fecha = (opts.fecha ?? "").trim() || null;
+  if (fecha && (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha)))) return { error: "Fecha de entrega no válida" };
+  if (fecha && fecha < diaISO()) return { error: "La fecha de entrega no puede ser anterior a hoy" };
   const ot = await db.query.ordenesTrabajo.findFirst({ where: and(eq(t.ordenesTrabajo.tallerId, s.tid), eq(t.ordenesTrabajo.id, otId)) });
   if (!ot) return { error: "Orden no encontrada" };
   if (ot.cerradaEn) return { error: "La orden ya está cerrada" };
@@ -32,15 +43,19 @@ export async function crearPresupuesto(otId: string): Promise<R & { id?: string 
   const tot = totales(lineas, iva.modo, iva.pct, iva.preciosConIva);
   const copia: LineaPresupuesto[] = lineas.map((l) => ({
     tipo: l.tipo, especialidad: l.especialidad, referencia: l.referencia, descripcion: l.descripcion,
-    cantidad: l.cantidad, precio: l.precio, descuento: l.descuento, importe: importeLinea(l),
+    cantidad: l.cantidad, precio: l.precio, descuento: l.descuento, importe: importeLinea(l), lineaId: l.id,
   }));
+  // Último aceptado: si existe, esto es una ampliación sobre él
+  const aceptado = await db.query.presupuestos.findFirst({
+    where: and(eq(t.presupuestos.tallerId, s.tid), eq(t.presupuestos.otId, otId), eq(t.presupuestos.estado, "aprobado")),
+    orderBy: desc(t.presupuestos.version),
+  });
+  if (aceptado && aceptado.total === tot.total && cambiosAmpliacion(aceptado.lineas, copia).length === 0)
+    return { error: `No hay cambios respecto al presupuesto aceptado ${aceptado.numero}: añade primero lo nuevo en «Importes»` };
 
   const p = await db.transaction(async (tx) => {
-    const [{ version, aprobados }] = await tx
-      .select({
-        version: sql<number>`coalesce(max(${t.presupuestos.version}), 0) + 1`,
-        aprobados: sql<number>`count(*) filter (where ${t.presupuestos.estado} = 'aprobado')`,
-      })
+    const [{ version }] = await tx
+      .select({ version: sql<number>`coalesce(max(${t.presupuestos.version}), 0) + 1` })
       .from(t.presupuestos)
       .where(and(eq(t.presupuestos.tallerId, s.tid), eq(t.presupuestos.otId, otId)));
     await tx
@@ -54,7 +69,10 @@ export async function crearPresupuesto(otId: string): Promise<R & { id?: string 
         otId,
         numero: `${ot.numero}-P${Number(version)}`,
         version: Number(version),
-        tipo: Number(aprobados) > 0 ? "complementario" : "inicial",
+        tipo: aceptado ? "complementario" : "inicial",
+        ampliaId: aceptado?.id ?? null,
+        horasEstimadas: horas !== null ? horas.toFixed(2) : null,
+        fechaEntrega: fecha,
         lineas: copia,
         ivaModo: iva.modo,
         ivaPct: Number(iva.pct).toFixed(2),
@@ -69,9 +87,23 @@ export async function crearPresupuesto(otId: string): Promise<R & { id?: string 
       .returning();
     return nuevo;
   });
-  await auditar(s, "crear_presupuesto", "ot", otId, { presupuesto: p.numero, total: p.total });
-  revalidatePath(`/ot/${otId}`);
+  await auditar(s, "crear_presupuesto", "ot", otId, { presupuesto: p.numero, total: p.total, amplia: aceptado?.numero ?? null, horas, fecha });
+  revalidatePath("/", "layout");
   return { id: p.id };
+}
+
+/** Quita un presupuesto que el cliente no ha llegado a aceptar ni rechazar. Su enlace deja de funcionar y su número no se reutiliza. */
+export async function borrarPresupuesto(id: string): Promise<R> {
+  const s = await requireSesion("importes");
+  const r = await db
+    .update(t.presupuestos)
+    .set({ estado: "borrado" })
+    .where(and(eq(t.presupuestos.tallerId, s.tid), eq(t.presupuestos.id, id), inArray(t.presupuestos.estado, ["pendiente", "sustituido"])))
+    .returning({ otId: t.presupuestos.otId, numero: t.presupuestos.numero, total: t.presupuestos.total });
+  if (!r.length) return { error: "Solo se puede borrar un presupuesto que el cliente no ha aceptado ni rechazado" };
+  await auditar(s, "borrar_presupuesto", "ot", r[0].otId, { presupuesto: r[0].numero, total: r[0].total });
+  revalidatePath("/", "layout");
+  return {};
 }
 
 async function presupuestoDeSesion(tid: string, id: string) {

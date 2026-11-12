@@ -24,7 +24,7 @@ export default async function FirmarPresupuesto({ params }: { params: Promise<{ 
     <div className="mx-auto max-w-3xl space-y-4">
       <div>
         <Link href={`/ot/${ot.id}`} className="text-sm text-slate-500 hover:text-slate-800">← Volver a la orden {ot.numero}</Link>
-        <h1 className="mt-1 text-2xl font-bold">{p.tipo === "complementario" ? "Presupuesto complementario" : "Presupuesto"}</h1>
+        <h1 className="mt-1 text-2xl font-bold">{p.tipo === "complementario" ? "Ampliación de presupuesto" : "Presupuesto"}</h1>
       </div>
       <Tarjeta className="space-y-4 p-4 md:p-6">
         <div className="flex flex-wrap items-center gap-3">
@@ -33,7 +33,7 @@ export default async function FirmarPresupuesto({ params }: { params: Promise<{ 
           <span className="text-slate-600">· {cliente.nombre}</span>
         </div>
         {ot.trabajoSolicitado && <p className="rounded-xl bg-slate-50 p-3 text-sm">{ot.trabajoSolicitado}</p>}
-        <VistaPresupuesto p={p} />
+        <VistaPresupuesto p={p} ampliacion={c.ampliacion} />
         <p className="text-xs leading-relaxed text-slate-500">{taller.config.textoPresupuesto || TEXTOS_LEGALES_BASE.textoPresupuesto}</p>
       </Tarjeta>
 
@@ -42,7 +42,7 @@ export default async function FirmarPresupuesto({ params }: { params: Promise<{ 
       ) : (
         <Tarjeta className="p-4 text-center">
           <p className="font-semibold">
-            {p.estado === "aprobado" ? "Este presupuesto ya está aceptado." : p.estado === "rechazado" ? "El cliente no aceptó este presupuesto." : p.estado === "sustituido" ? "Este presupuesto se ha sustituido por uno más reciente." : ot.cerradaEn ? "La orden ya está cerrada." : "Este presupuesto ha caducado: crea uno nuevo desde la orden."}
+            {p.estado === "aprobado" ? "Este presupuesto ya está aceptado." : p.estado === "rechazado" ? "El cliente no aceptó este presupuesto." : p.estado === "sustituido" ? "Este presupuesto se ha sustituido por uno más reciente." : p.estado === "borrado" ? "Este presupuesto se ha borrado." : ot.cerradaEn ? "La orden ya está cerrada." : "Este presupuesto ha caducado: crea uno nuevo desde la orden."}
           </p>
           <Link href={`/ot/${ot.id}`} className="mt-2 inline-block text-sm font-semibold underline">Volver a la orden</Link>
         </Tarjeta>

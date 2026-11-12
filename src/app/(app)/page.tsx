@@ -2,16 +2,18 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Car, CheckCircle2, ClipboardPlus, Clock, Hourglass,
-  MessageCircle, Phone, Receipt, ShieldCheck, UserX, Wrench,
+  Phone, Receipt, ShieldCheck, UserX, Wallet, Wrench,
 } from "lucide-react";
 import { requireSesion } from "@/lib/auth";
-import { actividadSemana, citasDelDia, entregadosRecientes, flotaSustitucion, incidenciasAbiertas, listarOTsAbiertas, mecanicos } from "@/lib/data";
+import { actividadSemana, citasDelDia, entregadosRecientes, flotaSustitucion, incidenciasAbiertas, listarOTsAbiertas, mecanicos, pendientesCobro } from "@/lib/data";
+import { fmtEuros } from "@/lib/importes";
 import { tallerPorId } from "@/lib/taller";
 import { nombresPuestos, tiene, type Puesto } from "@/lib/puestos";
+import { cuando } from "@/lib/citas";
 import { esperaAprobacionOPerito, esRetrasada } from "@/lib/ots";
 import { mensajeListo } from "@/lib/mensajes";
 import { AvisoListo } from "@/components/aviso-listo";
-import { diaISO, enlaceWhatsapp, fmtFecha, fmtFechaHora, fmtHora, TIPO_INCIDENCIA, ZONA } from "@/lib/formato";
+import { diaISO, enlaceWhatsapp, fmtFecha, fmtFechaHora, TIPO_INCIDENCIA, ZONA } from "@/lib/formato";
 import { BotonLink, Matricula, Pastilla, Tarjeta, TituloSeccion, Vacio, cx } from "@/components/ui";
 import { OtTarjeta } from "@/components/ot-tarjeta";
 import { BuscadorGlobal } from "@/components/buscador-global";
@@ -29,18 +31,20 @@ export default async function Inicio() {
   const s = await requireSesion("oficina");
   const P = s.puestos;
 
-  const [ots, citas, flota, taller, semana, entregados, incidencias, mecs] = await Promise.all([
+  const [ots, citas, flota, taller, semana, entregados, incidencias, mecs, porCobrar] = await Promise.all([
     listarOTsAbiertas(s.tid),
-    ve(P, "recepcion", "direccion") ? citasDelDia(s.tid) : Promise.resolve([]),
+    ve(P, "recepcion", "direccion", "telefono") ? citasDelDia(s.tid) : Promise.resolve([]),
     flotaSustitucion(s.tid),
     tallerPorId(s.tid),
     ve(P, "direccion") ? actividadSemana(s.tid) : Promise.resolve(null),
     ve(P, "facturacion", "direccion") ? entregadosRecientes(s.tid, 7) : Promise.resolve([]),
     ve(P, "jefe_taller", "direccion") ? incidenciasAbiertas(s.tid) : Promise.resolve([]),
     ve(P, "jefe_taller", "direccion") ? mecanicos(s.tid) : Promise.resolve([]),
+    ve(P, "facturacion", "direccion", "recepcion") ? pendientesCobro(s.tid) : Promise.resolve([]),
   ]);
 
   const listos = ots.filter((o) => o.estadoMarca === "listo");
+  const citasHoy = citas.filter(({ c }) => c.estado !== "anulada");
   const retrasados = ots.filter(esRetrasada);
   const esperando = ots.filter(esperaAprobacionOPerito);
   const sinAsignar = ots.filter((o) => !o.mecanicoId && o.estadoMarca !== "listo");
@@ -51,6 +55,7 @@ export default async function Inicio() {
   // Clientes a llamar: retrasados (avisar del nuevo plazo) y pendientes de su aprobación
   const aLlamar = [
     ...ots.filter((o) => o.requiereAprobacion && !o.datosSiniestro?.companiaNombre).map((o) => ({ o, motivo: "Confirmar presupuesto", color: "#7c3aed" })),
+    ...ots.filter((o) => o.ampliacionPendiente).map((o) => ({ o, motivo: "* Confirmar ampliación", color: "#b45309" })),
     ...retrasados.map((o) => ({ o, motivo: `Retrasado (prevista ${fmtFecha(o.fechaPrevista)})`, color: "#b91c1c" })),
   ].filter((x, i, arr) => arr.findIndex((y) => y.o.id === x.o.id) === i);
 
@@ -106,7 +111,7 @@ export default async function Inicio() {
 
   if (ve(P, "telefono", "recepcion", "direccion"))
     principal.push(
-      <Bloque key="llamar" titulo="Clientes a llamar" icono={Phone} n={aLlamar.length} ayuda="Retrasados y presupuestos sin confirmar. Llamar antes de que llamen ellos.">
+      <Bloque key="llamar" titulo="Clientes a llamar" icono={Phone} n={aLlamar.length} ayuda="Retrasados, presupuestos y ampliaciones sin confirmar. Llamar antes de que llamen ellos.">
         {aLlamar.length === 0 ? (
           <Tarjeta><Vacio>Nadie pendiente de llamar. 👍</Vacio></Tarjeta>
         ) : (
@@ -149,9 +154,30 @@ export default async function Inicio() {
       </Bloque>,
     );
 
+  if (ve(P, "facturacion", "direccion", "recepcion") && porCobrar.length > 0)
+    principal.push(
+      <Bloque key="porcobrar" titulo="Pendiente de cobro" icono={Wallet} n={porCobrar.length} ayuda={`Total pendiente: ${fmtEuros(porCobrar.reduce((s2, f) => s2 + f.pendienteCliente + f.pendienteCompania, 0))}`}>
+        <Tarjeta className="divide-y divide-slate-100">
+          {porCobrar.map((f) => (
+            <Link key={f.otId} href={`/ot/${f.otId}`} className="flex flex-wrap items-center gap-3 p-3 hover:bg-slate-50">
+              <Matricula>{f.matricula}</Matricula>
+              <div className="min-w-40 flex-1 text-sm">
+                <div className="font-semibold">{f.clienteNombre} <span className="font-mono text-xs font-normal text-slate-400">{f.numero}</span></div>
+                <div className="text-xs text-slate-500">{f.cerradaEn ? `Entregado ${fmtFechaHora(f.cerradaEn)}` : "En taller"} · total {fmtEuros(f.total)}</div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {f.pendienteCliente > 0 && <Pastilla color="#b45309">Cliente {fmtEuros(f.pendienteCliente)}</Pastilla>}
+                {f.pendienteCompania > 0 && <Pastilla color="#7c3aed">{f.reparto.companiaNombre} {fmtEuros(f.pendienteCompania)}</Pastilla>}
+              </div>
+            </Link>
+          ))}
+        </Tarjeta>
+      </Bloque>,
+    );
+
   if (ve(P, "facturacion", "direccion"))
     principal.push(
-      <Bloque key="entregados" titulo="Entregados (últimos 7 días)" icono={Receipt} n={entregados.length} ayuda="Para pasar al programa de facturación. Proformas y cobros llegarán en el siguiente bloque.">
+      <Bloque key="entregados" titulo="Entregados (últimos 7 días)" icono={Receipt} n={entregados.length} ayuda="Para pasar al programa de facturación; apunta allí el nº de factura en cada orden.">
         {entregados.length === 0 ? (
           <Tarjeta><Vacio>No se ha entregado ningún vehículo esta semana.</Vacio></Tarjeta>
         ) : (
@@ -167,6 +193,8 @@ export default async function Inicio() {
                   <span className="inline-flex items-center gap-1 text-xs text-slate-600"><ShieldCheck className="size-3.5" aria-hidden /> Paga {o.datosSiniestro.companiaNombre}</span>
                 )}
                 {o.clienteExento && <Pastilla color="#0f766e">Exento de IVA</Pastilla>}
+                {o.total != null && <span className="text-sm font-semibold tabular-nums">{fmtEuros(o.total)}</span>}
+                {o.total != null && (o.facturaExterna ? <Pastilla color="#047857">Factura {o.facturaExterna}</Pastilla> : <Pastilla color="#64748b">Sin nº de factura</Pastilla>)}
               </Link>
             ))}
           </Tarjeta>
@@ -177,14 +205,14 @@ export default async function Inicio() {
   // ── Columna lateral ──
   const lateral: ReactNode[] = [];
 
-  if (ve(P, "recepcion", "direccion"))
+  if (ve(P, "recepcion", "direccion", "telefono"))
     lateral.push(
-      <Bloque key="citas" titulo="Citas de hoy" icono={CalendarDays} n={citas.length}>
+      <Bloque key="citas" titulo="Citas de hoy" icono={CalendarDays} n={citasHoy.length} accion={tiene(P, "citas") ? <Link href="/agenda" className="text-sm font-semibold text-slate-600 hover:underline">Agenda →</Link> : undefined}>
         <Tarjeta className="divide-y divide-slate-100">
-          {citas.length === 0 && <Vacio>Sin citas hoy.</Vacio>}
-          {citas.map(({ c, tipoNombre, tipoColor }) => (
-            <div key={c.id} className="flex items-center gap-3 p-3">
-              <div className="w-12 text-sm font-bold tabular-nums">{fmtHora(c.fechaHora)}</div>
+          {citasHoy.length === 0 && <Vacio>Sin citas hoy.</Vacio>}
+          {citasHoy.map(({ c, tipoNombre, tipoColor }) => (
+            <div key={c.id} className={cx("flex items-center gap-3 p-3", c.estado === "no_vino" && "opacity-60")}>
+              <div className="w-20 shrink-0 text-sm font-bold first-letter:uppercase">{cuando(c)}</div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{c.contacto}</div>
                 <div className="truncate text-xs text-slate-500">{c.motivo}</div>
@@ -195,6 +223,8 @@ export default async function Inicio() {
               </div>
               {c.otId ? (
                 <Link className="text-xs font-semibold text-emerald-700" href={`/ot/${c.otId}`}>Recibido</Link>
+              ) : c.estado === "no_vino" ? (
+                <span className="text-xs font-semibold text-red-700">No vino</span>
               ) : (
                 tiene(P, "recepcion") && <BotonLink variante="secundario" className="min-h-10 px-3 text-sm" href={`/recepcion/nueva?cita=${c.id}`}>Recibir</BotonLink>
               )}

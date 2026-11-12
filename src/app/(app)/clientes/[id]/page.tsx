@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Camera, ClipboardList, ClipboardPlus, FileText, Mail, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
+import { CalendarPlus, Camera, ClipboardList, ClipboardPlus, FileText, Mail, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
 import { requireSesion } from "@/lib/auth";
+import { tiene } from "@/lib/puestos";
 import { getCliente } from "@/lib/data";
 import { tallerPorId } from "@/lib/taller";
 import { enlaceDocumento } from "@/lib/enlaces";
@@ -92,9 +93,16 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
                         {enTaller ? (
                           <Link href={`/ot/${enTaller.id}`} className="text-xs font-semibold text-primary">En taller: {enTaller.estadoNombre} →</Link>
                         ) : (
-                          <BotonLink variante="secundario" className="min-h-9 px-3 text-xs" href={`/recepcion/nueva?matricula=${encodeURIComponent(v.matricula)}`}>
-                            <ClipboardPlus className="size-4" /> Nueva recepción
-                          </BotonLink>
+                          <span className="flex flex-wrap justify-end gap-2">
+                            {tiene(s.puestos, "citas") && (
+                              <BotonLink variante="secundario" className="min-h-9 px-3 text-xs" href={`/agenda?nueva=1&matricula=${encodeURIComponent(v.matricula)}`}>
+                                <CalendarPlus className="size-4" /> Dar cita
+                              </BotonLink>
+                            )}
+                            <BotonLink variante="secundario" className="min-h-9 px-3 text-xs" href={`/recepcion/nueva?matricula=${encodeURIComponent(v.matricula)}`}>
+                              <ClipboardPlus className="size-4" /> Nueva recepción
+                            </BotonLink>
+                          </span>
                         )}
                       </div>
                     </div>

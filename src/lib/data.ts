@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, t } from "@/db";
 import { diaISO, inicioDia } from "./formato";
@@ -64,6 +64,8 @@ function consultaOTs(tid: string, filtro: SQL | undefined) {
       mecanicoColor: mecanico.color,
       incidenciasAbiertas: sql<number>`coalesce(${incAbiertas.n}, 0)`,
       averiasPendientes: sql<number>`coalesce(${incAbiertas.averias}, 0)`,
+      // Ampliación de presupuesto enviada y sin respuesta: se sigue con lo aprobado, lo nuevo espera
+      ampliacionPendiente: sql<boolean>`exists (select 1 from ${t.presupuestos} where ${t.presupuestos.otId} = ${t.ordenesTrabajo.id} and ${t.presupuestos.tipo} = 'complementario' and ${t.presupuestos.estado} = 'pendiente')`,
     })
     .from(t.ordenesTrabajo)
     .innerJoin(t.tiposOrden, eq(t.tiposOrden.id, t.ordenesTrabajo.tipoOrdenId))
@@ -128,7 +130,7 @@ export async function getOT(tid: string, id: string) {
   if (!ot) return null;
 
   const usuarioH = alias(t.usuarios, "uh");
-  const [estados, historialEst, asignaciones, recepcion, entrega, incidencias, archivos, documentos, prestamos, lineas, presupuestos] = await Promise.all([
+  const [estados, historialEst, asignaciones, recepcion, entrega, incidencias, archivos, documentos, prestamos, lineas, presupuestos, proforma, cobros] = await Promise.all([
     db.select().from(t.estadosFlujo).where(and(eq(t.estadosFlujo.tallerId, tid), eq(t.estadosFlujo.tipoOrdenId, ot.tipo.id))).orderBy(asc(t.estadosFlujo.orden)),
     db
       .select({ id: t.historialEstados.id, fecha: t.historialEstados.fecha, comentario: t.historialEstados.comentario, estado: t.estadosFlujo.nombre, usuario: usuarioH.nombre })
@@ -160,7 +162,14 @@ export async function getOT(tid: string, id: string) {
       .where(and(eq(t.prestamos.tallerId, tid), eq(t.prestamos.otId, id)))
       .orderBy(desc(t.prestamos.salidaEn)),
     db.select().from(t.lineasOt).where(and(eq(t.lineasOt.tallerId, tid), eq(t.lineasOt.otId, id))).orderBy(asc(t.lineasOt.orden), asc(t.lineasOt.creadoEn)),
-    db.select().from(t.presupuestos).where(and(eq(t.presupuestos.tallerId, tid), eq(t.presupuestos.otId, id))).orderBy(desc(t.presupuestos.version)),
+    db.select().from(t.presupuestos).where(and(eq(t.presupuestos.tallerId, tid), eq(t.presupuestos.otId, id), ne(t.presupuestos.estado, "borrado"))).orderBy(desc(t.presupuestos.version)),
+    db.query.proformas.findFirst({ where: and(eq(t.proformas.tallerId, tid), eq(t.proformas.otId, id), eq(t.proformas.estado, "vigente")) }),
+    db
+      .select({ c: t.cobros, usuario: usuarioH.nombre })
+      .from(t.cobros)
+      .leftJoin(usuarioH, eq(usuarioH.id, t.cobros.usuarioId))
+      .where(and(eq(t.cobros.tallerId, tid), eq(t.cobros.otId, id)))
+      .orderBy(asc(t.cobros.fecha)),
   ]);
 
   const historial = [
@@ -170,13 +179,13 @@ export async function getOT(tid: string, id: string) {
       return { id: a.id, fecha: a.fecha, usuario: a.usuario, comentario: null, estado: nombre ? `Asignado a ${nombre}` : "Sin mecánico asignado", tipo: "mecanico" as const };
     }),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
-  return { ...ot, estados, historial, recepcion, entrega, incidencias, archivos, documentos, prestamos, lineas, presupuestos };
+  return { ...ot, estados, historial, recepcion, entrega, incidencias, archivos, documentos, prestamos, lineas, presupuestos, proforma: proforma ?? null, cobros };
 }
 export type OTDetalle = NonNullable<Awaited<ReturnType<typeof getOT>>>;
 
 export async function mecanicos(tid: string) {
   return db
-    .select({ id: t.usuarios.id, nombre: t.usuarios.nombre, color: t.usuarios.color })
+    .select({ id: t.usuarios.id, nombre: t.usuarios.nombre, color: t.usuarios.color, especialidades: t.usuarios.especialidades })
     .from(t.usuarios)
     .where(and(eq(t.usuarios.tallerId, tid), sql`${"mecanico"} = any(${t.usuarios.puestos})`, eq(t.usuarios.activo, true)))
     .orderBy(asc(t.usuarios.nombre));
@@ -193,13 +202,42 @@ export async function compania(tid: string) {
 export async function citasDelDia(tid: string, dia = diaISO()) {
   // Límites del día en hora de Madrid (el servidor puede estar en UTC)
   const ini = inicioDia(dia);
-  const fin = inicioDia(diaISO(new Date(ini.getTime() + 36 * 3_600_000)));
+  return citasEntre(tid, dia, diaISO(new Date(ini.getTime() + 36 * 3_600_000)));
+}
+
+/** Citas desde el día `desde` (incluido) hasta `hasta` (excluido), AAAA-MM-DD en hora de Madrid. */
+export async function citasEntre(tid: string, desde: string, hasta: string) {
+  const ini = inicioDia(desde);
+  const fin = inicioDia(hasta);
+  const creador = alias(t.usuarios, "creador");
   return db
-    .select({ c: t.citas, tipoNombre: t.tiposOrden.nombre, tipoColor: t.tiposOrden.color })
+    .select({
+      c: t.citas,
+      tipoNombre: t.tiposOrden.nombre,
+      tipoColor: t.tiposOrden.color,
+      clienteNombre: t.clientes.nombre,
+      aceptaWhatsapp: t.clientes.aceptaWhatsapp,
+      vehiculo: sql<string | null>`nullif(trim(concat_ws(' ', ${t.vehiculos.marca}, ${t.vehiculos.modelo})), '')`,
+      creadoPorNombre: creador.nombre,
+    })
     .from(t.citas)
     .leftJoin(t.tiposOrden, eq(t.tiposOrden.id, t.citas.tipoOrdenId))
+    .leftJoin(t.clientes, eq(t.clientes.id, t.citas.clienteId))
+    .leftJoin(t.vehiculos, eq(t.vehiculos.id, t.citas.vehiculoId))
+    .leftJoin(creador, eq(creador.id, t.citas.creadoPor))
     .where(and(eq(t.citas.tallerId, tid), gte(t.citas.fechaHora, ini), lt(t.citas.fechaHora, fin)))
-    .orderBy(asc(t.citas.fechaHora));
+    .orderBy(asc(t.citas.fechaHora), asc(t.citas.creadoEn));
+}
+export type CitaDia = Awaited<ReturnType<typeof citasDelDia>>[number];
+
+/** Nº de citas activas por día (AAAA-MM-DD, hora de Madrid) entre dos días. */
+export async function citasPorDia(tid: string, desde: string, hasta: string) {
+  const filas = await db
+    .select({ dia: sql<string>`to_char(${t.citas.fechaHora} at time zone 'Europe/Madrid', 'YYYY-MM-DD')`, n: sql<number>`count(*)::int` })
+    .from(t.citas)
+    .where(and(eq(t.citas.tallerId, tid), ne(t.citas.estado, "anulada"), gte(t.citas.fechaHora, inicioDia(desde)), lt(t.citas.fechaHora, inicioDia(hasta))))
+    .groupBy(sql`1`);
+  return Object.fromEntries(filas.map((f) => [f.dia, f.n])) as Record<string, number>;
 }
 
 export async function flotaSustitucion(tid: string) {
@@ -345,6 +383,9 @@ export async function listarEmpleados(tid: string) {
       color: t.usuarios.color,
       puestos: t.usuarios.puestos,
       activo: t.usuarios.activo,
+      especialidades: t.usuarios.especialidades,
+      horasDia: t.usuarios.horasDia,
+      diasTrabajo: t.usuarios.diasTrabajo,
       trabajosAbiertos: sql<number>`(select count(*)::int from ordenes_trabajo o where o.mecanico_id = ${U} and o.cerrada_en is null)`,
     })
     .from(t.usuarios)
@@ -385,13 +426,50 @@ export async function entregadosRecientes(tid: string, dias = 7) {
       matricula: t.vehiculos.matricula,
       marca: t.vehiculos.marca,
       modelo: t.vehiculos.modelo,
+      anuladaEn: t.ordenesTrabajo.anuladaEn,
+      total: t.proformas.total,
+      facturaExterna: t.proformas.facturaExterna,
     })
     .from(t.ordenesTrabajo)
     .innerJoin(t.tiposOrden, eq(t.tiposOrden.id, t.ordenesTrabajo.tipoOrdenId))
     .innerJoin(t.clientes, eq(t.clientes.id, t.ordenesTrabajo.clienteId))
     .innerJoin(t.vehiculos, eq(t.vehiculos.id, t.ordenesTrabajo.vehiculoId))
+    .leftJoin(t.proformas, and(eq(t.proformas.otId, t.ordenesTrabajo.id), eq(t.proformas.estado, "vigente")))
     .where(and(eq(t.ordenesTrabajo.tallerId, tid), gte(t.ordenesTrabajo.cerradaEn, desde)))
     .orderBy(desc(t.ordenesTrabajo.cerradaEn));
+}
+
+/** Órdenes con proforma y algo pendiente de cobrar (del cliente o de la compañía), de la más antigua a la más reciente. */
+export async function pendientesCobro(tid: string) {
+  const pagado = (q: "cliente" | "compania") =>
+    // Subconsulta con nombres calificados a mano (dentro de un subselect drizzle no los califica)
+    sql<number>`coalesce((select sum(cb.importe) from cobros cb where cb.ot_id = "ordenes_trabajo"."id" and cb.pagador = ${q} and cb.anulado_en is null), 0)::int`;
+  const filas = await db
+    .select({
+      otId: t.ordenesTrabajo.id,
+      numero: t.ordenesTrabajo.numero,
+      cerradaEn: t.ordenesTrabajo.cerradaEn,
+      clienteNombre: t.clientes.nombre,
+      clienteTelefono: t.clientes.telefono,
+      matricula: t.vehiculos.matricula,
+      total: t.proformas.total,
+      reparto: t.proformas.reparto,
+      pagadoCliente: pagado("cliente"),
+      pagadoCompania: pagado("compania"),
+    })
+    .from(t.proformas)
+    .innerJoin(t.ordenesTrabajo, eq(t.ordenesTrabajo.id, t.proformas.otId))
+    .innerJoin(t.clientes, eq(t.clientes.id, t.ordenesTrabajo.clienteId))
+    .innerJoin(t.vehiculos, eq(t.vehiculos.id, t.ordenesTrabajo.vehiculoId))
+    .where(and(eq(t.proformas.tallerId, tid), eq(t.proformas.estado, "vigente"), isNull(t.ordenesTrabajo.anuladaEn)))
+    .orderBy(asc(t.proformas.creadoEn));
+  return filas
+    .map((f) => ({
+      ...f,
+      pendienteCliente: Math.max(0, f.reparto.cliente - f.pagadoCliente),
+      pendienteCompania: Math.max(0, f.reparto.compania - f.pagadoCompania),
+    }))
+    .filter((f) => f.pendienteCliente + f.pendienteCompania > 0);
 }
 
 /** Entradas y salidas desde el lunes de esta semana. */

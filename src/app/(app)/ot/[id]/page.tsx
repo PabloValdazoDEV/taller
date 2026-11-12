@@ -16,9 +16,11 @@ import { CompartirDocumento } from "@/components/compartir-documento";
 import { enlaceDocumento } from "@/lib/enlaces";
 import { AnularOT, AsignarMecanico, EditarDatosOT, FlujoEstados, NuevaIncidencia, ResolverIncidencia, SubirFotos } from "./controles";
 import { Importes, TrabajoPrevisto, type LineaVista } from "./importes";
-import { fmtEuros, ivaDeOT, totales } from "@/lib/importes";
+import { fmtEuros, importeLinea, ivaDeOT, totales } from "@/lib/importes";
+import { cambiosAmpliacion, horasAmpliacion, horasManoObra } from "@/lib/ampliacion";
 import { caducado, enlacePresupuesto } from "@/lib/presupuestos";
 import { Presupuestos, type PresupuestoVista } from "./presupuestos";
+import { Cobros, type CobroVista, type ProformaVista } from "./cobros";
 
 export const dynamic = "force-dynamic";
 
@@ -46,8 +48,11 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
         ot.presupuestos.map(async (p) => {
           const vigente = p.estado === "pendiente" && !caducado(p) && !ot.ot.cerradaEn;
           const enlace = vigente ? await enlacePresupuesto(p) : null;
+          const amplia = p.ampliaId ? ot.presupuestos.find((a) => a.id === p.ampliaId) : null;
           return {
-            id: p.id, numero: p.numero, tipo: p.tipo, estado: p.estado, total: p.total,
+            id: p.id, numero: p.numero, tipo: p.tipo, estado: p.estado as PresupuestoVista["estado"], total: p.total,
+            horasEstimadas: p.horasEstimadas, fechaEntrega: p.fechaEntrega,
+            amplia: amplia ? { numero: amplia.numero, total: amplia.total } : null,
             creadoEn: p.creadoEn.toISOString(), validezHasta: p.validezHasta, caducado: caducado(p),
             decididoEn: p.decididoEn?.toISOString() ?? null, decididoVia: p.decididoVia, decididoNombre: p.decididoNombre, decisionNota: p.decisionNota,
             firmado: !!p.documentoId, enlace,
@@ -58,6 +63,17 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
         }),
       )
     : [];
+  // Para el próximo presupuesto: si ya hay uno aceptado será una ampliación sobre él
+  const aceptado = ot.presupuestos.find((p) => p.estado === "aprobado") ?? null;
+  const copiaActual = ot.lineas.map((l) => ({ ...l, importe: importeLinea(l), lineaId: l.id }));
+  const horasSugeridas = aceptado ? horasAmpliacion(cambiosAmpliacion(aceptado.lineas, copiaActual)) : horasManoObra(ot.lineas);
+  const ampliacionPendiente = ot.presupuestos.some((p) => p.tipo === "complementario" && p.estado === "pendiente");
+  const proforma: ProformaVista | null = ot.proforma
+    ? { id: ot.proforma.id, numero: ot.proforma.numero, total: ot.proforma.total, reparto: ot.proforma.reparto, facturaExterna: ot.proforma.facturaExterna, creadoEn: ot.proforma.creadoEn.toISOString(), conformidadExceso: ot.proforma.conformidadExceso }
+    : null;
+  const cobros: CobroVista[] = ot.cobros.map(({ c, usuario }) => ({
+    id: c.id, pagador: c.pagador, metodo: c.metodo, importe: c.importe, nota: c.nota, fecha: c.fecha.toISOString(), usuario, anulado: !!c.anuladoEn,
+  }));
   const cerrada = !!ot.ot.cerradaEn;
   const listo = ot.estado.marca === "listo";
   const sin = ot.ot.datosSiniestro;
@@ -142,7 +158,9 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
           <AlertTriangle className="size-5 shrink-0 mt-0.5" />
           <div className="text-sm">
             <b>Avería adicional pendiente de aprobación del cliente</b>
-            {esOficina ? " — llámale y marca la incidencia como resuelta (aprobada) o descartada." : " — la oficina lo está gestionando."} Se puede seguir con el trabajo ya aprobado.
+            {veImportes
+              ? " — añade lo nuevo en «Importes» y crea la ampliación del presupuesto (al aceptarla, la avería queda aprobada). Si lo aprueba de palabra, marca la incidencia como resuelta."
+              : esOficina ? " — llámale y marca la incidencia como resuelta (aprobada) o descartada." : " — la oficina lo está gestionando."} Se puede seguir con el trabajo ya aprobado.
           </div>
         </div>
       )}
@@ -155,6 +173,9 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
               <Matricula grande>{ot.vehiculo.matricula}</Matricula>
               <Pastilla color={ot.tipo.color}>{ot.tipo.nombre}</Pastilla>
               <span className="font-mono text-sm text-slate-400">{ot.ot.numero}</span>
+              {!cerrada && ampliacionPendiente && (
+                <Pastilla color="#b45309">* Ampliación pendiente: seguir con lo aprobado</Pastilla>
+              )}
             </div>
             <h1 className="text-xl font-bold mt-2 flex items-center gap-2 flex-wrap">{ot.vehiculo.marca && <LogoMarca marca={ot.vehiculo.marca} className="size-8" />}{ot.vehiculo.marca} {ot.vehiculo.modelo} <span className="text-slate-400 font-normal text-base">{ot.vehiculo.color}</span></h1>
             <div className="text-sm text-slate-600">
@@ -247,7 +268,28 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
               tarifas={taller.config.tarifas ?? {}}
               editable={!cerrada}
             />
-            <Presupuestos otId={ot.ot.id} presupuestos={presupuestos} hayLineas={lineas.length > 0} totalActual={totalActual} editable={!cerrada} cliente={ot.cliente.nombre} />
+            <Presupuestos
+              otId={ot.ot.id}
+              presupuestos={presupuestos}
+              hayLineas={lineas.length > 0}
+              totalActual={totalActual}
+              editable={!cerrada}
+              cliente={ot.cliente.nombre}
+              horasSugeridas={horasSugeridas}
+              fechaPrevista={ot.ot.fechaPrevista}
+              averiaPendiente={averiasPendientes.some(({ i }) => i.afectaPrecio)}
+            />
+            {(proforma || listo || cerrada || cobros.length > 0) && (
+              <Cobros
+                otId={ot.ot.id}
+                proforma={proforma}
+                cobros={cobros}
+                totalActual={totalActual}
+                hayLineas={lineas.length > 0}
+                abierta={!cerrada}
+                aceptado={ot.presupuestos.length ? { numero: aceptado?.numero ?? null, total: aceptado?.total ?? 0 } : null}
+              />
+            )}
             </>
           ) : (
             <TrabajoPrevisto lineas={lineas} />

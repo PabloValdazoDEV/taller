@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { SignJWT, jwtVerify } from "jose";
 import { db, t } from "@/db";
 import { secreto } from "./session-token";
@@ -10,6 +10,7 @@ import { tallerPorId } from "./taller";
 import { TEXTOS_LEGALES_BASE } from "./flujos-base";
 import { guardarDocumento, prepararEvidencia, tallerParaPdf } from "./pdf/generar";
 import { PresupuestoPdf, type DatosPresupuesto } from "./pdf/plantillas";
+import { cambiosAmpliacion } from "./ampliacion";
 
 /** Validez mínima del presupuesto (RD 1457/1986): 12 días hábiles. */
 export const DIAS_HABILES_VALIDEZ = 12;
@@ -58,8 +59,13 @@ export async function cargarPresupuesto(tid: string, id: string) {
     .leftJoin(t.usuarios, eq(t.usuarios.id, t.presupuestos.creadoPor))
     .where(and(eq(t.presupuestos.tallerId, tid), eq(t.presupuestos.id, id)));
   if (!r) return null;
-  const taller = await tallerPorId(tid);
-  return { ...r, taller };
+  const [taller, anterior] = await Promise.all([
+    tallerPorId(tid),
+    r.p.ampliaId ? db.query.presupuestos.findFirst({ where: and(eq(t.presupuestos.tallerId, tid), eq(t.presupuestos.id, r.p.ampliaId)) }) : null,
+  ]);
+  // Ampliación: el presupuesto aceptado al que amplía y lo que cambia
+  const ampliacion = anterior ? { numero: anterior.numero, total: anterior.total, cambios: cambiosAmpliacion(anterior.lineas, r.p.lineas) } : null;
+  return { ...r, taller, ampliacion };
 }
 export type PresupuestoCargado = NonNullable<Awaited<ReturnType<typeof cargarPresupuesto>>>;
 
@@ -70,6 +76,7 @@ export function situacion(p: PresupuestoCargado["p"]) {
   if (p.estado === "aprobado") return `Aprobado ${VIA[p.decididoVia ?? "manual"]}${p.decididoNombre ? ` por ${p.decididoNombre}` : ""} el ${new Date(p.decididoEn!).toLocaleDateString("es-ES", { timeZone: "Europe/Madrid" })}${p.decisionNota ? ` (${p.decisionNota})` : ""}`;
   if (p.estado === "rechazado") return `No aceptado${p.decisionNota ? `: ${p.decisionNota}` : ""}`;
   if (p.estado === "sustituido") return "Sustituido por un presupuesto posterior";
+  if (p.estado === "borrado") return "Anulado por el taller";
   return undefined;
 }
 
@@ -87,6 +94,9 @@ export async function datosPdf(c: PresupuestoCargado, firma?: { evidencia: Datos
     cliente,
     vehiculo,
     trabajoSolicitado: ot.trabajoSolicitado,
+    ampliacion: c.ampliacion,
+    horasEstimadas: p.horasEstimadas,
+    fechaEntrega: p.fechaEntrega,
     lineas: p.lineas,
     modo: p.ivaModo,
     pct: p.ivaPct,
@@ -143,7 +153,14 @@ export async function decidirPresupuesto(opts: {
 }): Promise<{ error?: string; estadoNuevo?: string | null }> {
   const c = await cargarPresupuesto(opts.tid, opts.presupuestoId);
   if (!c) return { error: "Presupuesto no encontrado" };
-  if (c.p.estado !== "pendiente") return { error: c.p.estado === "aprobado" ? "Este presupuesto ya está aceptado" : c.p.estado === "rechazado" ? "Este presupuesto ya se rechazó" : "Este presupuesto se ha sustituido por otro más reciente" };
+  if (c.p.estado !== "pendiente")
+    return {
+      error:
+        c.p.estado === "aprobado" ? "Este presupuesto ya está aceptado"
+        : c.p.estado === "rechazado" ? "Este presupuesto ya se rechazó"
+        : c.p.estado === "borrado" ? "Este presupuesto ya no está disponible: pida al taller el actualizado"
+        : "Este presupuesto se ha sustituido por otro más reciente",
+    };
   if (c.ot.cerradaEn) return { error: "La orden ya está cerrada" };
   if (opts.decision === "aprobado" && caducado(c.p)) return { error: "El presupuesto ha caducado: pide al taller uno actualizado" };
 
@@ -182,6 +199,14 @@ export async function decidirPresupuesto(opts: {
         userAgent,
       });
       if (opts.decision !== "aprobado") return null;
+      // Al aceptar: la fecha de entrega del presupuesto pasa a la orden…
+      if (c.p.fechaEntrega && c.p.fechaEntrega !== c.ot.fechaPrevista)
+        await tx.update(t.ordenesTrabajo).set({ fechaPrevista: c.p.fechaEntrega, actualizadaEn: ahora }).where(eq(t.ordenesTrabajo.id, c.ot.id));
+      // …y las averías adicionales abiertas antes del presupuesto quedan aprobadas con él
+      await tx
+        .update(t.incidencias)
+        .set({ estado: "resuelta", resolucion: `Aprobada por el cliente en el presupuesto ${c.p.numero}`, resueltaEn: ahora, resueltaPor: opts.usuario?.uid ?? null })
+        .where(and(eq(t.incidencias.tallerId, opts.tid), eq(t.incidencias.otId, c.ot.id), eq(t.incidencias.tipo, "averia_adicional"), inArray(t.incidencias.estado, ["abierta", "en_curso"]), lte(t.incidencias.creadaEn, c.p.creadoEn)));
       const como = opts.via === "manual" ? `sin firma${opts.nota ? `: ${opts.nota}` : ""}` : opts.via === "tablet" ? "firmado en el taller" : "por enlace";
       return avanzarTrasAprobacion(tx, opts.tid, c.ot.id, opts.usuario?.uid ?? null, `Presupuesto ${c.p.numero} aceptado por ${opts.nombre} (${como})`);
     });

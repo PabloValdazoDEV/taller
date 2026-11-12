@@ -17,6 +17,7 @@ export default async function PresupuestoCliente({ params }: { params: Promise<{
   const v = await verificarTokenPresupuesto(token);
   const c = v ? await cargarPresupuesto(v.tallerId, v.id) : null;
   if (!c) return <Aviso titulo="Enlace no válido o caducado" texto="Pida al taller que le envíe el presupuesto de nuevo." />;
+  if (c.p.estado === "borrado") return <Aviso titulo="Este presupuesto ya no está disponible" texto="El taller lo ha retirado. Si le han enviado otro, use ese enlace." />;
   const { p, ot, cliente, vehiculo, taller } = c;
   const telefono = taller.telefono;
   const pendiente = p.estado === "pendiente" && !caducado(p) && !ot.cerradaEn;
@@ -38,13 +39,13 @@ export default async function PresupuestoCliente({ params }: { params: Promise<{
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
           <div>
             <h1 className="text-xl font-bold">Hola, {cliente.nombre.split(" ")[0]}</h1>
-            <p className="text-slate-600">Este es el {p.tipo === "complementario" ? "presupuesto complementario" : "presupuesto"} de su vehículo:</p>
+            <p className="text-slate-600">{p.tipo === "complementario" ? "Al revisar su vehículo hemos visto que hace falta algo más. Esta es la ampliación del presupuesto:" : "Este es el presupuesto de su vehículo:"}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Matricula grande>{vehiculo.matricula}</Matricula>
             <span className="flex items-center gap-2 font-semibold">{vehiculo.marca && <LogoMarca marca={vehiculo.marca} className="size-7" />} {vehiculo.marca} {vehiculo.modelo}</span>
           </div>
-          <VistaPresupuesto p={p} />
+          <VistaPresupuesto p={p} ampliacion={c.ampliacion} />
           <a href={`/p/${token}/pdf`} target="_blank" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50">
             <Download className="size-4" aria-hidden /> Descargar en PDF
           </a>
@@ -52,13 +53,13 @@ export default async function PresupuestoCliente({ params }: { params: Promise<{
         </section>
 
         {pendiente ? (
-          <DecisionCliente token={token} nombre={cliente.nombre} />
+          <DecisionCliente token={token} nombre={cliente.nombre} ampliacion={p.tipo === "complementario"} />
         ) : p.estado === "aprobado" ? (
           <Estado icono={<Check className="size-6" />} color="bg-emerald-50 text-emerald-900 border-emerald-200" titulo="Presupuesto aceptado. ¡Gracias!" texto={`Aceptado el ${fmtFecha(p.decididoEn)}${p.decididoNombre ? ` por ${p.decididoNombre}` : ""}. Le avisaremos cuando su vehículo esté listo.`} />
         ) : p.estado === "rechazado" ? (
           <Estado icono={<X className="size-6" />} color="bg-slate-50 text-slate-800 border-slate-200" titulo="Ha indicado que no acepta este presupuesto" texto="Si cambia de opinión o quiere comentarlo, llámenos." telefono={telefono} />
         ) : (
-          <Estado icono={<Phone className="size-6" />} color="bg-amber-50 text-amber-900 border-amber-200" titulo={p.estado === "sustituido" ? "Hay un presupuesto más reciente" : "Este presupuesto ya no está vigente"} texto="Pida al taller el presupuesto actualizado." telefono={telefono} />
+          <Estado icono={<Phone className="size-6" />} color="bg-amber-50 text-amber-900 border-amber-200" titulo={p.estado === "sustituido" ? "Hay un presupuesto más reciente" : p.estado === "borrado" ? "Este presupuesto ya no está disponible" : "Este presupuesto ya no está vigente"} texto="Pida al taller el presupuesto actualizado." telefono={telefono} />
         )}
       </div>
     </main>

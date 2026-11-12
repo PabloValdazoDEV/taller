@@ -258,6 +258,11 @@ export function ResolverIncidencia({ id }: { id: string }) {
       const r = await resolverIncidencia(id, texto, descartar);
       if (r.error) setError(r.error);
     });
+  const cerrar = () => {
+    setAbierto(false);
+    setTexto("");
+    setError("");
+  };
   if (!abierto)
     return (
       <Boton variante="secundario" className="min-h-10 px-3 text-sm" onClick={() => setAbierto(true)}>
@@ -265,10 +270,18 @@ export function ResolverIncidencia({ id }: { id: string }) {
       </Boton>
     );
   return (
-    <div className="mt-2 flex flex-col sm:flex-row gap-2">
-      <Input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Cómo se ha resuelto (p. ej. «Cliente aprueba por teléfono»)" className="flex-1" />
-      <Boton disabled={pend} onClick={() => enviar(false)}>Resuelta</Boton>
-      <Boton variante="fantasma" disabled={pend} onClick={() => enviar(true)}>Descartar</Boton>
+    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <Input
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && cerrar()}
+        placeholder="Cómo se ha resuelto (p. ej. «Cliente aprueba por teléfono»)"
+        className="flex-1 sm:min-w-64"
+        autoFocus
+      />
+      <Boton disabled={pend} onClick={() => enviar(false)}>{pend && <Loader2 className="size-4 animate-spin" aria-hidden />} Resuelta</Boton>
+      <Boton variante="secundario" disabled={pend} onClick={() => enviar(true)} title="La incidencia no procede: se cierra sin hacer nada">Descartar incidencia</Boton>
+      <Boton variante="fantasma" disabled={pend} onClick={cerrar}>Cancelar</Boton>
       {error && <p className="text-sm text-red-600 sm:self-center">{error}</p>}
     </div>
   );

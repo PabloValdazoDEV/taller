@@ -17,6 +17,14 @@ export function inicioDia(diaIso: string) {
   return new Date(utc.getTime() - (enMadrid - enUtc));
 }
 
+/** Instante del día `diaIso` a la hora `hhmm` («09:30») en hora de Madrid (correcto también los días de cambio de hora). */
+export function instanteMadrid(diaIso: string, hhmm: string) {
+  const utc = new Date(`${diaIso}T${hhmm}:00Z`);
+  const enMadrid = Date.parse(utc.toLocaleString("en-US", { timeZone: ZONA }));
+  const enUtc = Date.parse(utc.toLocaleString("en-US", { timeZone: "UTC" }));
+  return new Date(utc.getTime() - (enMadrid - enUtc));
+}
+
 export const fmtHora = (d: Date | string) => new Date(d).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: ZONA });
 
 export const fmtFecha = (d: Date | string | null | undefined) =>

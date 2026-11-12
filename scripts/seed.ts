@@ -14,7 +14,7 @@ const SLUG = process.env.DEFAULT_TALLER_SLUG ?? "valrodri";
 
 async function borrarTaller(tallerId: string) {
   const tablas = [
-    t.auditoria, t.catalogoVehiculos, t.citas, t.presupuestos, t.prestamos, t.cochesSustitucion, t.documentos, t.archivos, t.incidencias,
+    t.auditoria, t.catalogoVehiculos, t.citas, t.cobros, t.proformas, t.presupuestos, t.prestamos, t.cochesSustitucion, t.documentos, t.archivos, t.incidencias,
     t.entregas, t.recepciones, t.historialEstados, t.lineasOt, t.ordenesTrabajo, t.estadosFlujo, t.tiposOrden,
     t.vehiculos, t.clientes, t.usuarios, t.contadores,
   ] as const;
@@ -93,7 +93,7 @@ async function main() {
       email: "talleresvalrodri@hotmail.com",
       colorPrimario: "#c2410c",
       // Tarifas de ejemplo (€/h sin IVA): el taller pone las suyas en Configuración
-      config: { ...TEXTOS_LEGALES_BASE, demo: true, horario: "L-V 8:30-14:00 y 15:00-18:00", tarifas: { mecanica: 45, chapa: 42, pintura: 42, lunas: 40 } },
+      config: { ...TEXTOS_LEGALES_BASE, demo: true, horario: "L-V 8:30-14:00 y 15:00-18:00", tarifas: { mecanica: 45, chapa: 42, pintura: 42, lunas: 40 }, capacidad: { plazas: 12, maxPorFranja: 3, diasAbiertos: [1, 2, 3, 4, 5] } },
     })
     .returning();
   const tid = taller.id;
@@ -125,6 +125,8 @@ async function main() {
           nombre: u.nombre,
           puestos: u.puestos,
           color: u.color,
+          // Capacidad: especialidad de cada mecánico (8 h/día de lunes a viernes por defecto)
+          especialidades: (u.puestos as Puesto[]).includes("mecanico") ? [u.nombre.includes("chapa") ? ("chapa" as const) : u.nombre.includes("pintura") ? ("pintura" as const) : ("mecanica" as const)] : [],
           pinHash: await bcrypt.hash(u.pin, 10),
         })),
       ),

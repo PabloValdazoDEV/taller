@@ -16,6 +16,7 @@ import { fmtCombustible, fmtFechaHora, fmtKm } from "@/lib/formato";
 import { zonaDano } from "@/lib/silueta";
 import { separarTelefono } from "@/lib/telefono";
 import { buscarPorMatricula, crearRecepcion } from "../actions";
+import { NuevaCompania } from "../../clientes/nueva-compania";
 
 type Tipo = { id: string; nombre: string; color: string; requiereSiniestro: boolean };
 type Compania = { id: string; nombre: string; tipo: string };
@@ -25,7 +26,9 @@ const TESTIGOS = ["Motor", "ABS", "Airbag", "Batería", "Aceite", "Frenos", "Tem
 const OBJETOS = ["Llave (1)", "Llaves (2)", "Documentación", "Rueda de repuesto", "Gato / herramientas", "Tapacubos", "Silla infantil", "Objetos personales"];
 const PASOS = ["Vehículo y cliente", "Trabajo", "Estado del vehículo", "Fotos", "Revisión y firma"];
 
-export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[]; companias: Compania[]; prefill: Prefill }) {
+export function AsistenteRecepcion({ tipos, companias: companiasIniciales, prefill }: { tipos: Tipo[]; companias: Compania[]; prefill: Prefill }) {
+  // Se puede dar de alta una compañía nueva sin salir de la recepción
+  const [companias, setCompanias] = useState(companiasIniciales);
   const [paso, setPaso] = useState(0);
   const [error, setError] = useState("");
   const [buscando, startBuscar] = useTransition();
@@ -385,12 +388,23 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
             {tipoSel?.requiereSiniestro && (
               <fieldset className="grid sm:grid-cols-2 gap-4 rounded-xl bg-violet-50 p-4">
                 <legend className="text-sm font-semibold text-violet-800 px-1">Datos de la compañía</legend>
-                <Campo etiqueta="Compañía" className="sm:col-span-2">
-                  <Select value={d.siniestro.companiaId} onChange={(e) => set("siniestro", { ...d.siniestro, companiaId: e.target.value })}>
-                    <option value="">— Elige —</option>
-                    {companias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                  </Select>
-                </Campo>
+                <div className="sm:col-span-2 flex flex-wrap items-end gap-2">
+                  <Campo etiqueta="Compañía" className="min-w-0 flex-1 basis-56">
+                    <Select value={d.siniestro.companiaId} onChange={(e) => set("siniestro", { ...d.siniestro, companiaId: e.target.value })}>
+                      <option value="">— Elige —</option>
+                      {companias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </Select>
+                  </Campo>
+                  <NuevaCompania
+                    texto="Nueva"
+                    className="min-h-11"
+                    tipoInicial={/renting|flota/i.test(tipoSel?.nombre ?? "") ? "flota" : "aseguradora"}
+                    onCreada={(c) => {
+                      setCompanias((v) => [...v, c].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")));
+                      set("siniestro", { ...d.siniestro, companiaId: c.id });
+                    }}
+                  />
+                </div>
                 <Campo etiqueta="Nº siniestro / autorización"><Input value={d.siniestro.numeroSiniestro} onChange={(e) => set("siniestro", { ...d.siniestro, numeroSiniestro: e.target.value })} /></Campo>
                 <Campo etiqueta="Nº póliza / contrato"><Input value={d.siniestro.numeroPoliza} onChange={(e) => set("siniestro", { ...d.siniestro, numeroPoliza: e.target.value })} /></Campo>
                 <Campo etiqueta="Perito (si se conoce)"><Input value={d.siniestro.perito} onChange={(e) => set("siniestro", { ...d.siniestro, perito: e.target.value })} /></Campo>
@@ -412,7 +426,7 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
               <Campo etiqueta="Fecha prevista de entrega"><Input type="date" value={d.fechaPrevista} min={d.fechaEntrada.slice(0, 10)} onChange={(e) => set("fechaPrevista", e.target.value)} /></Campo>
               <label className="sm:col-span-2 flex items-center gap-2 text-sm min-h-11">
                 <input type="checkbox" className="size-5" checked={d.renunciaPresupuesto} onChange={(e) => set("renunciaPresupuesto", e.target.checked)} />
-                El cliente renuncia a presupuesto previo
+                El cliente autoriza la reparación sin presupuesto previo
               </label>
             </div>
           </div>
@@ -459,7 +473,7 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
                   <Fila t="Tipo">{tipoSel?.nombre}{d.siniestro.numeroSiniestro && tipoSel?.requiereSiniestro ? ` · ${companias.find((c) => c.id === d.siniestro.companiaId)?.nombre} ${d.siniestro.numeroSiniestro}` : ""}</Fila>
                   <Fila t="Trabajo"><span className="whitespace-pre-line">{d.trabajo.trim() || tipoSel?.nombre}</span></Fila>
                   <Fila t="Recepción">{d.fechaEntrada && fmtFechaHora(new Date(d.fechaEntrada))}</Fila>
-                  <Fila t="Presupuesto">{d.renunciaPresupuesto ? "Renuncia a presupuesto previo" : "Se facilitará presupuesto"}</Fila>
+                  <Fila t="Presupuesto">{d.renunciaPresupuesto ? "Autoriza la reparación sin presupuesto previo" : "Se facilitará presupuesto"}</Fila>
                 </BloqueRevision>
                 <BloqueRevision titulo={PASOS[2]} onCambiar={() => irA(2)}>
                   <Fila t="Km / comb.">{fmtKm(Number(d.km))} · {fmtCombustible(d.combustible)}</Fila>

@@ -44,6 +44,11 @@ export function OtTarjeta({ ot, mostrarEstado = true, compacta = false }: { ot: 
             Aprobación extra
           </span>
         )}
+        {ot.ampliacionPendiente && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[11px] font-semibold" title="Ampliación de presupuesto sin aceptar: se sigue con lo aprobado, lo nuevo espera">
+            <span aria-hidden className="text-sm leading-none">*</span> Ampliación pendiente
+          </span>
+        )}
         {ot.incidenciasAbiertas > 0 && (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
             <AlertTriangle className="size-3.5" /> {ot.incidenciasAbiertas}

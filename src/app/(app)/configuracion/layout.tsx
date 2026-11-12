@@ -7,7 +7,7 @@ export default async function ConfiguracionLayout({ children }: { children: Reac
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Configuración</h1>
-        <p className="text-sm text-slate-500">Empleados, coches de sustitución y datos del taller.</p>
+        <p className="text-sm text-slate-500">Empleados, coches de sustitución, capacidad y datos del taller.</p>
       </div>
       <Pestanas />
       {children}

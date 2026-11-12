@@ -12,7 +12,7 @@ type Datos = {
   ivaDefecto: string; tarifas: Record<Especialidad, string>;
 };
 
-function Seccion({ titulo, descripcion, children }: { titulo: string; descripcion?: string; children: React.ReactNode }) {
+export function Seccion({ titulo, descripcion, children }: { titulo: string; descripcion?: string; children: React.ReactNode }) {
   return (
     <Tarjeta className="grid gap-4 p-5 lg:grid-cols-[16rem_1fr] lg:gap-8">
       <div>

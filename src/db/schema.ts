@@ -82,6 +82,17 @@ export type TallerConfig = {
   demo?: boolean;
   /** Precio por hora de mano de obra, SIN IVA, por especialidad (ver src/lib/importes.ts) */
   tarifas?: Partial<Record<"mecanica" | "chapa" | "pintura" | "lunas", number>>;
+  /** Capacidad del taller para dar citas (ver src/lib/carga.ts). Solo avisa, nunca bloquea. */
+  capacidad?: {
+    /** Coches que caben a la vez en el taller (campa, elevadores…) */
+    plazas?: number;
+    /** Máximo de coches que se pueden recibir en cada franja (a primera hora, por la mañana…) */
+    maxPorFranja?: number;
+    /** Días que abre el taller: 1 = lunes … 7 = domingo */
+    diasAbiertos?: number[];
+    /** Horas que suele ocupar cada tipo de trabajo, por especialidad (id del tipo de orden → horas) */
+    horasPorTipo?: Record<string, Partial<Record<"mecanica" | "chapa" | "pintura" | "lunas", number>>>;
+  };
 };
 
 export const usuarios = pgTable(
@@ -97,6 +108,10 @@ export const usuarios = pgTable(
     puestos: text("puestos").array().$type<Puesto[]>().notNull().default(sql`'{}'::text[]`),
     color: text("color").notNull().default("#64748b"),
     activo: boolean("activo").notNull().default(true),
+    /** Mecánicos: especialidades (mecanica | chapa | pintura | lunas; puede tener varias), horas de trabajo al día y días que trabaja (1 = lunes … 7 = domingo) */
+    especialidades: text("especialidades").array().$type<("mecanica" | "chapa" | "pintura" | "lunas")[]>().notNull().default(sql`'{}'::text[]`),
+    horasDia: numeric("horas_dia", { precision: 4, scale: 2 }).notNull().default("8"),
+    diasTrabajo: integer("dias_trabajo").array().notNull().default(sql`'{1,2,3,4,5}'::integer[]`),
   },
   (t) => [index("usuarios_taller_idx").on(t.tallerId)],
 );
@@ -273,6 +288,8 @@ export type LineaPresupuesto = {
   descuento: string;
   /** Importe de la línea en céntimos */
   importe: number;
+  /** Línea de la orden de la que sale (para ver qué cambia en una ampliación). Falta en copias antiguas. */
+  lineaId?: string;
 };
 
 /**
@@ -291,7 +308,14 @@ export const presupuestos = pgTable(
     numero: text("numero").notNull(),
     version: integer("version").notNull(),
     tipo: text("tipo").$type<"inicial" | "complementario">().notNull(),
-    estado: text("estado").$type<"pendiente" | "aprobado" | "rechazado" | "sustituido">().notNull().default("pendiente"),
+    /** «borrado»: no llegó a decidirse y se quitó (no se reutiliza su número; queda en auditoría) */
+    estado: text("estado").$type<"pendiente" | "aprobado" | "rechazado" | "sustituido" | "borrado">().notNull().default("pendiente"),
+    /** Ampliación (complementario): presupuesto aceptado al que amplía */
+    ampliaId: uuid("amplia_id"),
+    /** Horas de trabajo estimadas (en una ampliación, las horas de más) */
+    horasEstimadas: numeric("horas_estimadas", { precision: 7, scale: 2 }),
+    /** Fecha prevista de entrega (en una ampliación, la nueva fecha). Al aceptarlo pasa a la orden. */
+    fechaEntrega: date("fecha_entrega"),
     lineas: jsonb("lineas").$type<LineaPresupuesto[]>().notNull(),
     ivaModo: text("iva_modo").$type<"con_iva" | "exento">().notNull(),
     ivaPct: numeric("iva_pct", { precision: 5, scale: 2 }).notNull(),
@@ -317,6 +341,66 @@ export const presupuestos = pgTable(
     documentoId: uuid("documento_id").references(() => documentos.id),
   },
   (t) => [uniqueIndex("presupuestos_numero_uq").on(t.tallerId, t.numero), index("presupuestos_ot_idx").on(t.tallerId, t.otId)],
+);
+
+/** Quién paga qué (en céntimos): el cliente y, en siniestros o flotas, la compañía. */
+export type RepartoPago = { cliente: number; compania: number; companiaNombre: string | null };
+
+/**
+ * Proforma («no es factura»): copia de las líneas y totales al entregar, con el reparto entre pagadores.
+ * La factura legal se hace en el programa de facturación del taller (Verifactu); aquí se puede apuntar su número.
+ */
+export const proformas = pgTable(
+  "proformas",
+  {
+    id: id(),
+    tallerId: tallerId(),
+    otId: uuid("ot_id")
+      .notNull()
+      .references(() => ordenesTrabajo.id),
+    numero: text("numero").notNull(),
+    version: integer("version").notNull(),
+    estado: text("estado").$type<"vigente" | "sustituida">().notNull().default("vigente"),
+    lineas: jsonb("lineas").$type<LineaPresupuesto[]>().notNull(),
+    ivaModo: text("iva_modo").$type<"con_iva" | "exento">().notNull(),
+    ivaPct: numeric("iva_pct", { precision: 5, scale: 2 }).notNull(),
+    motivoExencion: text("motivo_exencion"),
+    preciosConIva: boolean("precios_con_iva").notNull(),
+    base: integer("base").notNull(),
+    iva: integer("iva").notNull(),
+    total: integer("total").notNull(),
+    reparto: jsonb("reparto").$type<RepartoPago>().notNull(),
+    /** Nº de la factura emitida en el programa de facturación (lo apunta facturación) */
+    facturaExterna: text("factura_externa"),
+    /** Si el total supera lo aceptado en el presupuesto: cómo ha dado el cliente su conformidad */
+    conformidadExceso: text("conformidad_exceso"),
+    creadoPor: uuid("creado_por").references(() => usuarios.id),
+    creadoEn: ts("creado_en").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("proformas_numero_uq").on(t.tallerId, t.numero), index("proformas_ot_idx").on(t.tallerId, t.otId)],
+);
+
+/** Cobros de una orden (efectivo, tarjeta, transferencia, Bizum), del cliente o de la compañía. No se borran: se anulan. */
+export const cobros = pgTable(
+  "cobros",
+  {
+    id: id(),
+    tallerId: tallerId(),
+    otId: uuid("ot_id")
+      .notNull()
+      .references(() => ordenesTrabajo.id),
+    proformaId: uuid("proforma_id").references(() => proformas.id),
+    pagador: text("pagador").$type<"cliente" | "compania">().notNull(),
+    metodo: text("metodo").$type<"efectivo" | "tarjeta" | "transferencia" | "bizum">().notNull(),
+    /** Céntimos */
+    importe: integer("importe").notNull(),
+    nota: text("nota"),
+    fecha: ts("fecha").notNull().defaultNow(),
+    usuarioId: uuid("usuario_id").references(() => usuarios.id),
+    anuladoEn: ts("anulado_en"),
+    anuladoPor: uuid("anulado_por").references(() => usuarios.id),
+  },
+  (t) => [index("cobros_ot_idx").on(t.tallerId, t.otId)],
 );
 
 export const historialEstados = pgTable("historial_estados", {
@@ -478,11 +562,22 @@ export const citas = pgTable("citas", {
   contacto: text("contacto").notNull(),
   telefono: text("telefono"),
   matricula: text("matricula"),
+  /** Hora exacta o, si hay franja, la hora de referencia de la franja (para ordenar) */
   fechaHora: ts("fecha_hora").notNull(),
+  /** «A primera hora», «Por la mañana»…; null = hora exacta (ver src/lib/citas.ts) */
+  franja: text("franja").$type<"primera_hora" | "manana" | "mediodia" | "tarde" | "ultima_hora">(),
   duracionMin: integer("duracion_min").notNull().default(30),
   motivo: text("motivo"),
+  nota: text("nota"),
   tipoOrdenId: uuid("tipo_orden_id").references(() => tiposOrden.id),
+  /** Horas de trabajo estimadas por especialidad (se proponen según el tipo de trabajo; ver src/lib/carga.ts) */
+  horas: jsonb("horas").$type<Partial<Record<"mecanica" | "chapa" | "pintura" | "lunas", number>>>().notNull().default({}),
+  necesitaSustitucion: boolean("necesita_sustitucion").notNull().default(false),
+  /** Recibida: la orden que se abrió al recibir el coche */
   otId: uuid("ot_id").references(() => ordenesTrabajo.id),
+  estado: text("estado").$type<"pendiente" | "anulada" | "no_vino">().notNull().default("pendiente"),
+  creadoPor: uuid("creado_por").references(() => usuarios.id),
+  creadoEn: ts("creado_en").notNull().defaultNow(),
 });
 
 /** Marcas/modelos creados por el taller que no están en el catálogo base (src/data). modelo null = marca. */

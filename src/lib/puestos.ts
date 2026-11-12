@@ -22,6 +22,8 @@ const PERMISOS = {
   /** Recibir y entregar vehículos, préstamos de coches de sustitución */
   recepcion: ["direccion", "recepcion", "jefe_taller"],
   clientes: OFICINA,
+  /** Agenda: dar, cambiar y anular citas de entrada */
+  citas: ["direccion", "recepcion", "telefono", "jefe_taller"],
   tablero: [...OFICINA, "mecanico"],
   misTrabajos: ["mecanico", "jefe_taller", "direccion"],
   /** Asignar mecánicos, resolver incidencias, retroceder estados */
@@ -32,6 +34,8 @@ const PERMISOS = {
   configuracion: ["direccion"],
   /** Ver y editar los importes (mano de obra, piezas, IVA) */
   importes: ["direccion", "recepcion", "facturacion", "jefe_taller"],
+  /** Resumen de facturación: facturado, cobrado, pendiente, por compañía; exportar para la gestoría */
+  facturacion: ["direccion", "facturacion"],
   /** Anular una orden dada de alta por error */
   anularOrden: ["direccion"],
 } satisfies Record<string, Puesto[]>;

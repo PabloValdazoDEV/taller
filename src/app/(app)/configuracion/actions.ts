@@ -53,6 +53,13 @@ export async function guardarEmpleado(fd: FormData): Promise<R> {
   const cifras = longitudPin(puestos);
   if (v.data.pin && v.data.pin.length !== cifras) return { error: `Con estos puestos el PIN debe tener ${cifras} cifras` };
 
+  // Trabajo en el taller (mecánicos): especialidad, horas al día y días (para la carga de la agenda)
+  const especialidades = ESPECIALIDADES.filter((e) => fd.getAll("especialidades").includes(e));
+  const horasDia = fd.get("horasDia") == null ? 8 : leerDecimal(fd.get("horasDia"));
+  if (!Number.isFinite(horasDia) || horasDia < 0 || horasDia > 16) return { error: "Horas de trabajo al día no válidas (de 0 a 16)" };
+  const diasTrabajo = fd.has("diasTrabajoEnviado") ? [...new Set(fd.getAll("diasTrabajo").map(Number).filter((n) => n >= 1 && n <= 7))].sort() : [1, 2, 3, 4, 5];
+  const trabajo = puestos.includes("mecanico") ? { especialidades: especialidades.length ? especialidades : (["mecanica"] as Especialidad[]), horasDia: String(Math.round(horasDia * 4) / 4), diasTrabajo } : {};
+
   // Nombre único entre los activos (en la pantalla de acceso se elige por nombre)
   const repetido = await db.query.usuarios.findFirst({
     where: and(eq(t.usuarios.tallerId, s.tid), eq(t.usuarios.activo, true), sql`lower(${t.usuarios.nombre}) = lower(${v.data.nombre})`, id ? ne(t.usuarios.id, id) : undefined),
@@ -63,7 +70,7 @@ export async function guardarEmpleado(fd: FormData): Promise<R> {
     if (!v.data.pin) return { error: `Indica un PIN de ${cifras} cifras` };
     const [u] = await db
       .insert(t.usuarios)
-      .values({ tallerId: s.tid, nombre: v.data.nombre, color: v.data.color, puestos, pinHash: await bcrypt.hash(v.data.pin, 10) })
+      .values({ tallerId: s.tid, nombre: v.data.nombre, color: v.data.color, puestos, ...trabajo, pinHash: await bcrypt.hash(v.data.pin, 10) })
       .returning({ id: t.usuarios.id });
     await auditar(s, "crear_empleado", "usuario", u.id, { nombre: v.data.nombre, puestos });
   } else {
@@ -74,7 +81,7 @@ export async function guardarEmpleado(fd: FormData): Promise<R> {
     if (!v.data.pin && longitudPin(actual.puestos) !== cifras) return { error: `Con estos puestos su PIN pasa a tener ${cifras} cifras: ponle un PIN nuevo` };
     await db
       .update(t.usuarios)
-      .set({ nombre: v.data.nombre, color: v.data.color, puestos, ...(v.data.pin ? { pinHash: await bcrypt.hash(v.data.pin, 10) } : {}) })
+      .set({ nombre: v.data.nombre, color: v.data.color, puestos, ...trabajo, ...(v.data.pin ? { pinHash: await bcrypt.hash(v.data.pin, 10) } : {}) })
       .where(and(eq(t.usuarios.tallerId, s.tid), eq(t.usuarios.id, id)));
     await auditar(s, "editar_empleado", "usuario", id, { nombre: v.data.nombre, puestos, cambioPin: !!v.data.pin });
   }
@@ -308,6 +315,46 @@ export async function guardarTaller(fd: FormData): Promise<R> {
     })
     .where(eq(t.talleres.id, s.tid));
   await auditar(s, "editar_taller", "taller", s.tid, { nombre: d.nombre, logoCambiado: logoRuta !== actual.logoRuta, selloCambiado: selloRuta !== actual.selloRuta });
+  revalidatePath("/", "layout");
+  return {};
+}
+
+// ───────────────────────── Capacidad ─────────────────────────
+
+/** Días que abre, plazas, recepciones por franja y horas por tipo de trabajo (para los avisos de la agenda). */
+export async function guardarCapacidad(fd: FormData): Promise<R> {
+  const s = await requireSesion("configuracion");
+  const entero = (k: string, max: number) => {
+    const v = String(fd.get(k) ?? "").trim();
+    if (!v) return undefined;
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 1 && n <= max ? n : NaN;
+  };
+  const plazas = entero("plazas", 500);
+  const maxPorFranja = entero("maxPorFranja", 50);
+  if (Number.isNaN(plazas)) return { error: "Plazas no válidas (un número de 1 a 500)" };
+  if (Number.isNaN(maxPorFranja)) return { error: "Recepciones por franja no válidas (un número de 1 a 50)" };
+  const diasAbiertos = [...new Set(fd.getAll("diasAbiertos").map(Number).filter((n) => n >= 1 && n <= 7))].sort();
+  if (!diasAbiertos.length) return { error: "Marca al menos un día que abra el taller" };
+
+  const tipos = await db.select({ id: t.tiposOrden.id }).from(t.tiposOrden).where(eq(t.tiposOrden.tallerId, s.tid));
+  const horasPorTipo: Record<string, Partial<Record<Especialidad, number>>> = {};
+  for (const tp of tipos) {
+    const h: Partial<Record<Especialidad, number>> = {};
+    for (const e of ESPECIALIDADES) {
+      const v = String(fd.get(`h_${tp.id}_${e}`) ?? "").trim();
+      if (!v) continue;
+      const n = leerDecimal(v);
+      if (!Number.isFinite(n) || n < 0 || n > 200) return { error: `Horas de ${NOMBRE_ESPECIALIDAD[e].toLowerCase()} no válidas` };
+      if (n > 0) h[e] = Math.round(n * 4) / 4;
+    }
+    horasPorTipo[tp.id] = h;
+  }
+
+  const actual = await tallerPorId(s.tid);
+  const capacidad = { plazas, maxPorFranja, diasAbiertos, horasPorTipo };
+  await db.update(t.talleres).set({ config: { ...actual.config, capacidad } }).where(eq(t.talleres.id, s.tid));
+  await auditar(s, "editar_capacidad", "taller", s.tid, { plazas, maxPorFranja, diasAbiertos });
   revalidatePath("/", "layout");
   return {};
 }
