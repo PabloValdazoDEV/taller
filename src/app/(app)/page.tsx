@@ -1,138 +1,318 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarDays, Car, CheckCircle2, ClipboardPlus, Hourglass, MessageCircle } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Car, CheckCircle2, ClipboardPlus, Clock, Hourglass,
+  MessageCircle, Phone, Receipt, ShieldCheck, UserX, Wrench,
+} from "lucide-react";
 import { requireSesion } from "@/lib/auth";
-import { citasDelDia, flotaSustitucion, listarOTsAbiertas } from "@/lib/data";
+import { actividadSemana, citasDelDia, entregadosRecientes, flotaSustitucion, incidenciasAbiertas, listarOTsAbiertas, mecanicos } from "@/lib/data";
 import { tallerPorId } from "@/lib/taller";
-import { BotonLink, Matricula, Pastilla, Tarjeta, TituloSeccion, Vacio } from "@/components/ui";
+import { nombresPuestos, tiene, type Puesto } from "@/lib/puestos";
+import { hoyISO } from "@/lib/estado-cliente";
+import { enlaceWhatsapp, fmtFecha, fmtFechaHora, TIPO_INCIDENCIA } from "@/lib/formato";
+import { BotonLink, Matricula, Pastilla, Tarjeta, TituloSeccion, Vacio, cx } from "@/components/ui";
 import { OtTarjeta } from "@/components/ot-tarjeta";
-import { enlaceWhatsapp } from "@/lib/formato";
+import { BuscadorGlobal } from "@/components/buscador-global";
+import { AutoRefresco } from "@/components/auto-refresco";
 
 export const dynamic = "force-dynamic";
 
+/*
+ * Inicio de oficina. Cada bloque está ligado a uno o varios puestos; una persona ve la suma de los suyos
+ * (p. ej. recepción + teléfono + facturación), sin duplicados y en un orden fijo.
+ */
+const ve = (puestos: Puesto[], ...para: Puesto[]) => puestos.some((p) => para.includes(p));
+
 export default async function Inicio() {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
-  const [ots, citas, flota, taller] = await Promise.all([listarOTsAbiertas(s.tid), citasDelDia(s.tid), flotaSustitucion(s.tid), tallerPorId(s.tid)]);
+  const s = await requireSesion("oficina");
+  const P = s.puestos;
+  const hoy = hoyISO();
+
+  const [ots, citas, flota, taller, semana, entregados, incidencias, mecs] = await Promise.all([
+    listarOTsAbiertas(s.tid),
+    ve(P, "recepcion", "direccion") ? citasDelDia(s.tid) : Promise.resolve([]),
+    flotaSustitucion(s.tid),
+    tallerPorId(s.tid),
+    ve(P, "direccion") ? actividadSemana(s.tid) : Promise.resolve(null),
+    ve(P, "facturacion", "direccion") ? entregadosRecientes(s.tid, 7) : Promise.resolve([]),
+    ve(P, "jefe_taller", "direccion") ? incidenciasAbiertas(s.tid) : Promise.resolve([]),
+    ve(P, "jefe_taller", "direccion") ? mecanicos(s.tid) : Promise.resolve([]),
+  ]);
 
   const listos = ots.filter((o) => o.estadoMarca === "listo");
-  const pendientes = ots.filter((o) => o.requiereAprobacion || /peritaje/i.test(o.estadoNombre));
-  const conIncidencias = ots.filter((o) => o.incidenciasAbiertas > 0);
-  const disponibles = flota.filter((c) => c.estado === "disponible").length;
+  const retrasados = ots.filter((o) => o.fechaPrevista && o.fechaPrevista < hoy && o.estadoMarca !== "listo");
+  const esperando = ots.filter((o) => o.requiereAprobacion || /perit|autoriza/i.test(o.estadoNombre));
+  const sinAsignar = ots.filter((o) => !o.mecanicoId && o.estadoMarca !== "listo");
+  const prestados = flota.filter((c) => c.estado === "prestado").length;
+  const en30 = new Date(Date.now() + 30 * 86400_000).toLocaleDateString("sv-SE");
+  const alertasFlota = flota.filter((c) => (c.itvHasta && c.itvHasta < en30) || (c.seguroHasta && c.seguroHasta < en30));
+  const horario = taller.config.horario ? ` Horario: ${taller.config.horario}.` : "";
 
-  const kpis = [
-    { t: "En taller", v: ots.length, i: Car, c: "text-slate-700" },
-    { t: "Listos para entregar", v: listos.length, i: CheckCircle2, c: "text-emerald-600" },
-    { t: "Pendientes aprobación / perito", v: pendientes.length, i: Hourglass, c: "text-violet-600" },
-    { t: "Con incidencias abiertas", v: conIncidencias.length, i: AlertTriangle, c: "text-amber-600" },
+  // Clientes a llamar: retrasados (avisar del nuevo plazo) y pendientes de su aprobación
+  const aLlamar = [
+    ...ots.filter((o) => o.requiereAprobacion && !o.datosSiniestro?.companiaNombre).map((o) => ({ o, motivo: "Confirmar presupuesto", color: "#7c3aed" })),
+    ...retrasados.map((o) => ({ o, motivo: `Retrasado (prevista ${fmtFecha(o.fechaPrevista)})`, color: "#b91c1c" })),
+  ].filter((x, i, arr) => arr.findIndex((y) => y.o.id === x.o.id) === i);
+
+  const kpis: { t: string; v: string | number; i: typeof Car; c: string; href?: string }[] = [
+    { t: "En taller", v: ots.length, i: Car, c: "text-slate-700", href: "/tablero" },
+    { t: "Listos para entregar", v: listos.length, i: CheckCircle2, c: "text-emerald-700" },
+    { t: "Retrasados", v: retrasados.length, i: Clock, c: retrasados.length ? "text-red-700" : "text-slate-700" },
+    { t: "Esperando aprobación o perito", v: esperando.length, i: Hourglass, c: "text-violet-700" },
   ];
+  if (semana)
+    kpis.push(
+      { t: "Entradas esta semana", v: semana.entradas, i: ArrowDownToLine, c: "text-slate-700" },
+      { t: "Entregados esta semana", v: semana.salidas, i: ArrowUpFromLine, c: "text-slate-700" },
+      { t: "Coches de sustitución en uso", v: `${prestados}/${flota.length}`, i: Car, c: "text-slate-700", href: "/sustitucion" },
+      { t: "Incidencias abiertas", v: incidencias.length, i: AlertTriangle, c: incidencias.length ? "text-amber-700" : "text-slate-700" },
+    );
+
+  // ── Bloques de la columna principal ──
+  const principal: ReactNode[] = [];
+
+  if (ve(P, "recepcion", "telefono"))
+    principal.push(
+      <Bloque key="listos" titulo="Listos para entregar" icono={CheckCircle2} n={listos.length}>
+        {listos.length === 0 ? (
+          <Tarjeta><Vacio>Ningún vehículo listo todavía.</Vacio></Tarjeta>
+        ) : (
+          <Tarjeta className="divide-y divide-slate-100">
+            {listos.map((o) => {
+              const wa = enlaceWhatsapp(
+                o.clienteTelefono,
+                `Hola ${o.clienteNombre.split(" ")[0]}, le escribimos de ${taller.nombre}. Su vehículo ${o.marca ?? ""} ${o.modelo ?? ""} (${o.matricula}) ya está listo para recoger.${horario} ¡Gracias!`,
+              );
+              return (
+                <div key={o.id} className="flex flex-wrap items-center gap-3 p-3">
+                  <Matricula>{o.matricula}</Matricula>
+                  <Link href={`/ot/${o.id}`} className="min-w-40 flex-1 hover:underline">
+                    <div className="text-sm font-semibold">{o.marca} {o.modelo}</div>
+                    <div className="text-xs text-slate-500">{o.clienteNombre}</div>
+                  </Link>
+                  {wa && (
+                    <a href={wa} target="_blank" rel="noopener" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                      <MessageCircle className="size-4 text-[#128C7E]" aria-hidden /> Avisar
+                    </a>
+                  )}
+                  {tiene(P, "recepcion") && <BotonLink href={`/ot/${o.id}/entrega`} variante="exito" className="min-h-10">Entregar</BotonLink>}
+                </div>
+              );
+            })}
+          </Tarjeta>
+        )}
+      </Bloque>,
+    );
+
+  if (ve(P, "telefono", "recepcion", "direccion"))
+    principal.push(
+      <Bloque key="llamar" titulo="Clientes a llamar" icono={Phone} n={aLlamar.length} ayuda="Retrasados y presupuestos sin confirmar. Llamar antes de que llamen ellos.">
+        {aLlamar.length === 0 ? (
+          <Tarjeta><Vacio>Nadie pendiente de llamar. 👍</Vacio></Tarjeta>
+        ) : (
+          <Tarjeta className="divide-y divide-slate-100">
+            {aLlamar.map(({ o, motivo, color }) => (
+              <div key={o.id} className="flex flex-wrap items-center gap-3 p-3">
+                <Matricula>{o.matricula}</Matricula>
+                <Link href={`/ot/${o.id}`} className="min-w-40 flex-1 hover:underline">
+                  <div className="text-sm font-semibold">{o.clienteNombre}</div>
+                  <div className="text-xs text-slate-500">{o.marca} {o.modelo} · {o.estadoNombre}</div>
+                </Link>
+                <Pastilla color={color}>{motivo}</Pastilla>
+                {o.clienteTelefono && (
+                  <a href={`tel:${o.clienteTelefono.replace(/\s/g, "")}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 tabular-nums">
+                    <Phone className="size-4" aria-hidden /> {o.clienteTelefono}
+                  </a>
+                )}
+              </div>
+            ))}
+          </Tarjeta>
+        )}
+      </Bloque>,
+    );
+
+  if (ve(P, "jefe_taller", "direccion"))
+    principal.push(
+      <Bloque key="sinasignar" titulo="Sin mecánico asignado" icono={UserX} n={sinAsignar.length} accion={<Link href="/tablero" className="text-sm font-semibold text-slate-700 hover:underline">Ir al tablero</Link>}>
+        {sinAsignar.length === 0 ? (
+          <Tarjeta><Vacio>Todo el trabajo está repartido.</Vacio></Tarjeta>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">{sinAsignar.map((o) => <OtTarjeta key={o.id} ot={o} />)}</div>
+        )}
+      </Bloque>,
+      <Bloque key="bloqueados" titulo="Parados esperando a terceros" icono={Hourglass} n={esperando.length} ayuda="Aprobación del cliente, perito o autorización de la compañía.">
+        {esperando.length === 0 ? (
+          <Tarjeta><Vacio>Nada parado.</Vacio></Tarjeta>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">{esperando.map((o) => <OtTarjeta key={o.id} ot={o} />)}</div>
+        )}
+      </Bloque>,
+    );
+
+  if (ve(P, "facturacion", "direccion"))
+    principal.push(
+      <Bloque key="entregados" titulo="Entregados (últimos 7 días)" icono={Receipt} n={entregados.length} ayuda="Para pasar al programa de facturación. Proformas y cobros llegarán en el siguiente bloque.">
+        {entregados.length === 0 ? (
+          <Tarjeta><Vacio>No se ha entregado ningún vehículo esta semana.</Vacio></Tarjeta>
+        ) : (
+          <Tarjeta className="divide-y divide-slate-100">
+            {entregados.map((o) => (
+              <Link key={o.id} href={`/ot/${o.id}`} className="flex flex-wrap items-center gap-3 p-3 hover:bg-slate-50">
+                <Matricula>{o.matricula}</Matricula>
+                <div className="min-w-40 flex-1 text-sm">
+                  <div className="font-semibold">{o.clienteNombre} <span className="font-mono text-xs font-normal text-slate-400">{o.numero}</span></div>
+                  <div className="text-xs text-slate-500">{o.tipoNombre} · {fmtFechaHora(o.cerradaEn)}</div>
+                </div>
+                {o.datosSiniestro?.companiaNombre && (
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-600"><ShieldCheck className="size-3.5" aria-hidden /> Paga {o.datosSiniestro.companiaNombre}</span>
+                )}
+                {o.clienteExento && <Pastilla color="#0f766e">Exento de IVA</Pastilla>}
+              </Link>
+            ))}
+          </Tarjeta>
+        )}
+      </Bloque>,
+    );
+
+  // ── Columna lateral ──
+  const lateral: ReactNode[] = [];
+
+  if (ve(P, "recepcion", "direccion"))
+    lateral.push(
+      <Bloque key="citas" titulo="Citas de hoy" icono={CalendarDays} n={citas.length}>
+        <Tarjeta className="divide-y divide-slate-100">
+          {citas.length === 0 && <Vacio>Sin citas hoy.</Vacio>}
+          {citas.map(({ c, tipoNombre, tipoColor }) => (
+            <div key={c.id} className="flex items-center gap-3 p-3">
+              <div className="w-12 text-sm font-bold tabular-nums">{new Date(c.fechaHora).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold">{c.contacto}</div>
+                <div className="truncate text-xs text-slate-500">{c.motivo}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {c.matricula && <Matricula>{c.matricula}</Matricula>}
+                  {tipoNombre && <Pastilla color={tipoColor ?? undefined}>{tipoNombre}</Pastilla>}
+                </div>
+              </div>
+              {c.otId ? (
+                <Link className="text-xs font-semibold text-emerald-700" href={`/ot/${c.otId}`}>Recibido</Link>
+              ) : (
+                tiene(P, "recepcion") && <BotonLink variante="secundario" className="min-h-10 px-3 text-sm" href={`/recepcion/nueva?cita=${c.id}`}>Recibir</BotonLink>
+              )}
+            </div>
+          ))}
+        </Tarjeta>
+      </Bloque>,
+    );
+
+  if (ve(P, "jefe_taller", "direccion")) {
+    const carga = mecs.map((m) => ({ ...m, n: ots.filter((o) => o.mecanicoId === m.id && o.estadoMarca !== "listo").length }));
+    const max = Math.max(1, ...carga.map((c) => c.n));
+    lateral.push(
+      <Bloque key="carga" titulo="Carga por mecánico" icono={Wrench}>
+        <Tarjeta className="space-y-3 p-4">
+          {carga.length === 0 && <Vacio>No hay mecánicos dados de alta.</Vacio>}
+          {carga.map((m) => (
+            <div key={m.id}>
+              <div className="flex justify-between text-sm"><span className="font-medium">{m.nombre}</span><span className="tabular-nums text-slate-600">{m.n}</span></div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100" role="presentation">
+                <div className="h-full rounded-full" style={{ width: `${(m.n / max) * 100}%`, background: m.color }} />
+              </div>
+            </div>
+          ))}
+        </Tarjeta>
+      </Bloque>,
+      <Bloque key="incidencias" titulo="Incidencias abiertas" icono={AlertTriangle} n={incidencias.length}>
+        <Tarjeta className="divide-y divide-slate-100">
+          {incidencias.length === 0 && <Vacio>Sin incidencias abiertas.</Vacio>}
+          {incidencias.slice(0, 8).map((i) => (
+            <Link key={i.id} href={`/ot/${i.otId}`} className="block p-3 hover:bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Matricula>{i.matricula}</Matricula>
+                <span className={cx("text-xs font-semibold", i.tipo === "dano_taller" ? "text-red-700" : "text-amber-700")}>{TIPO_INCIDENCIA[i.tipo] ?? i.tipo}</span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-sm text-slate-600">{i.descripcion}</p>
+            </Link>
+          ))}
+        </Tarjeta>
+      </Bloque>,
+    );
+  }
+
+  if (ve(P, "recepcion", "direccion", "telefono"))
+    lateral.push(
+      <Bloque key="flota" titulo="Coches de sustitución" icono={Car} accion={<Link href="/sustitucion" className="text-sm font-semibold text-slate-700 hover:underline">Ver flota</Link>}>
+        <Tarjeta className="space-y-2 p-4 text-sm">
+          <div><span className="text-2xl font-bold tabular-nums">{flota.length - prestados}</span> de {flota.length} disponibles</div>
+          {alertasFlota.map((c) => (
+            <p key={c.id} className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="size-4 shrink-0" aria-hidden /> {c.matricula}: revisa ITV o seguro
+            </p>
+          ))}
+        </Tarjeta>
+      </Bloque>,
+    );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <AutoRefresco segundos={60} />
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Hola, {s.nombre}</h1>
-          <p className="text-slate-500 text-sm">{new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}</p>
+          <p className="text-sm text-slate-500">
+            {fechaLarga()} · {nombresPuestos(P)}
+          </p>
         </div>
-        <BotonLink href="/recepcion/nueva" className="text-base px-5 min-h-12">
-          <ClipboardPlus className="size-5" /> Nueva recepción
-        </BotonLink>
+        {tiene(P, "recepcion") && (
+          <BotonLink href="/recepcion/nueva" className="min-h-12 px-5 text-base">
+            <ClipboardPlus className="size-5" aria-hidden /> Nueva recepción
+          </BotonLink>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {kpis.map(({ t, v, i: I, c }) => (
-          <Tarjeta key={t} className="p-4">
-            <I className={`size-5 ${c}`} />
-            <div className="text-3xl font-bold mt-2 tabular-nums">{v}</div>
-            <div className="text-xs text-slate-500">{t}</div>
-          </Tarjeta>
-        ))}
+      <BuscadorGlobal grande={P.includes("telefono")} />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {kpis.map(({ t, v, i: I, c, href }) => {
+          const contenido = (
+            <>
+              <I className={cx("size-5", c)} aria-hidden />
+              <div className="mt-2 text-3xl font-bold tabular-nums">{v}</div>
+              <div className="text-xs text-slate-500">{t}</div>
+            </>
+          );
+          return href ? (
+            <Link key={t} href={href} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow">{contenido}</Link>
+          ) : (
+            <Tarjeta key={t} className="p-4">{contenido}</Tarjeta>
+          );
+        })}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <section className="lg:col-span-2 space-y-6">
-          <div>
-            <TituloSeccion>Listos para entregar</TituloSeccion>
-            {listos.length === 0 ? (
-              <Tarjeta><Vacio>Ningún vehículo listo todavía.</Vacio></Tarjeta>
-            ) : (
-              <div className="space-y-2">
-                {listos.map((o) => {
-                  const wa = enlaceWhatsapp(
-                    o.clienteTelefono,
-                    `Hola ${o.clienteNombre.split(" ")[0]}, le escribimos de ${taller.nombre}. Su vehículo ${o.marca} ${o.modelo} (${o.matricula}) ya está listo para recoger. Horario: L-V 8:30-14:00 y 15:00-18:00. ¡Gracias!`,
-                  );
-                  return (
-                    <Tarjeta key={o.id} className="p-3 flex flex-wrap items-center gap-3">
-                      <Matricula>{o.matricula}</Matricula>
-                      <Link href={`/ot/${o.id}`} className="flex-1 min-w-40">
-                        <div className="font-semibold text-sm">{o.marca} {o.modelo}</div>
-                        <div className="text-xs text-slate-500">{o.clienteNombre}</div>
-                      </Link>
-                      {wa && (
-                        <a href={wa} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] text-white px-3 min-h-10 text-sm font-semibold">
-                          <MessageCircle className="size-4" /> Avisar
-                        </a>
-                      )}
-                      <BotonLink href={`/ot/${o.id}/entrega`} variante="exito" className="min-h-10">Entregar</BotonLink>
-                    </Tarjeta>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <TituloSeccion>Pendientes de aprobación / peritaje</TituloSeccion>
-            {pendientes.length === 0 ? (
-              <Tarjeta><Vacio>Nada pendiente.</Vacio></Tarjeta>
-            ) : (
-              <div className="grid sm:grid-cols-2 gap-3">{pendientes.map((o) => <OtTarjeta key={o.id} ot={o} />)}</div>
-            )}
-          </div>
-
-          {conIncidencias.length > 0 && (
-            <div>
-              <TituloSeccion>Con incidencias abiertas</TituloSeccion>
-              <div className="grid sm:grid-cols-2 gap-3">{conIncidencias.map((o) => <OtTarjeta key={o.id} ot={o} />)}</div>
-            </div>
-          )}
-        </section>
-
-        <aside className="space-y-6">
-          <div>
-            <TituloSeccion><span className="inline-flex items-center gap-2"><CalendarDays className="size-4" /> Citas de hoy</span></TituloSeccion>
-            <Tarjeta className="divide-y divide-slate-100">
-              {citas.length === 0 && <Vacio>Sin citas hoy.</Vacio>}
-              {citas.map(({ c, tipoNombre, tipoColor }) => (
-                <div key={c.id} className="p-3 flex items-center gap-3">
-                  <div className="text-sm font-bold tabular-nums w-12">{new Date(c.fechaHora).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold truncate">{c.contacto}</div>
-                    <div className="text-xs text-slate-500 truncate">{c.motivo}</div>
-                    <div className="mt-1 flex gap-2 items-center">
-                      {c.matricula && <Matricula>{c.matricula}</Matricula>}
-                      {tipoNombre && <Pastilla color={tipoColor ?? undefined}>{tipoNombre}</Pastilla>}
-                    </div>
-                  </div>
-                  {c.otId ? (
-                    <Link className="text-xs text-emerald-700 font-semibold" href={`/ot/${c.otId}`}>Recibido</Link>
-                  ) : (
-                    <BotonLink variante="secundario" className="min-h-9 px-3 text-xs" href={`/recepcion/nueva?cita=${c.id}`}>Recibir</BotonLink>
-                  )}
-                </div>
-              ))}
-            </Tarjeta>
-          </div>
-
-          <div>
-            <TituloSeccion accion={<Link href="/sustitucion" className="text-xs text-primary font-semibold">Ver flota</Link>}>
-              Coches de sustitución
-            </TituloSeccion>
-            <Tarjeta className="p-4 text-sm">
-              <span className="text-2xl font-bold">{disponibles}</span> de {flota.length} disponibles
-            </Tarjeta>
-          </div>
-        </aside>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <section className="min-w-0 space-y-6 lg:col-span-2">{principal}</section>
+        <aside className="min-w-0 space-y-6">{lateral}</aside>
       </div>
     </div>
   );
 }
+
+function fechaLarga() {
+  const f = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+  return f.charAt(0).toUpperCase() + f.slice(1);
+}
+
+function Bloque({ titulo, icono: I, n, ayuda, accion, children }: { titulo: string; icono: typeof Car; n?: number; ayuda?: string; accion?: ReactNode; children: ReactNode }) {
+  return (
+    <div>
+      <TituloSeccion accion={accion}>
+        <span className="inline-flex items-center gap-2">
+          <I className="size-4 text-slate-500" aria-hidden /> {titulo}
+          {n !== undefined && n > 0 && <span className="rounded-full bg-slate-200 px-2 text-xs font-semibold tabular-nums text-slate-700">{n}</span>}
+        </span>
+      </TituloSeccion>
+      {ayuda && <p className="-mt-2 mb-3 text-xs text-slate-500">{ayuda}</p>}
+      {children}
+    </div>
+  );
+}
+

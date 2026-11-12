@@ -26,3 +26,33 @@ input,
 textarea {
   touch-action: manipulation;
 }
+
+/*
+ * Responsive: por defecto un hijo de grid/flex no se encoge por debajo de su contenido (min-width: auto),
+ * así que un texto largo sin espacios (huella SHA-256, email, VIN) o un `truncate` ensanchaba toda la página
+ * en el móvil. Con min-width: 0 los textos se recortan o parten en lugar de desbordar.
+ */
+.grid > * {
+  min-width: 0;
+}
+main {
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Safari (iPhone) daba a las rejillas sin columnas declaradas (`grid lg:grid-cols-3`) una columna
+ * tan ancha como su texto más largo (la huella SHA-256) aunque el hijo tuviera min-width: 0.
+ * Por defecto toda rejilla tiene una sola columna limitada al ancho disponible; las clases
+ * grid-cols-* de Tailwind (capa utilities) la sustituyen cuando se declaran.
+ */
+@layer base {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Red de seguridad: si algo se escapara, se recorta en vez de permitir scroll lateral o alejar el zoom. */
+html,
+body {
+  overflow-x: clip;
+}

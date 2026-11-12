@@ -10,8 +10,22 @@ import type { Evidencia, TallerPdf } from "./plantillas";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-export function tallerParaPdf(tl: typeof t.talleres.$inferSelect): TallerPdf {
-  return { nombre: tl.nombre, razonSocial: tl.razonSocial, nif: tl.nif, direccion: tl.direccion, telefono: tl.telefono, email: tl.email };
+/** Imagen guardada → data URL para el PDF. react-pdf solo admite PNG y JPEG (un logo WEBP se omite). */
+async function imagenPdf(ruta: string | null): Promise<string | null> {
+  if (!ruta) return null;
+  const ext = ruta.split(".").pop()?.toLowerCase();
+  const mime = ext === "png" ? "image/png" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : null;
+  if (!mime) return null;
+  try {
+    return `data:${mime};base64,${(await leerFichero(ruta)).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+export async function tallerParaPdf(tl: typeof t.talleres.$inferSelect): Promise<TallerPdf> {
+  const [logo, sello] = await Promise.all([imagenPdf(tl.logoRuta), imagenPdf(tl.selloRuta)]);
+  return { nombre: tl.nombre, razonSocial: tl.razonSocial, nif: tl.nif, direccion: tl.direccion, telefono: tl.telefono, email: tl.email, logo, sello };
 }
 
 /** Prepara las evidencias de la firma (antes de generar el PDF, que las incluye). */

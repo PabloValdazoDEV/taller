@@ -4,6 +4,7 @@ import { listarOTsAbiertas, tiposConEstados, type OTResumen } from "@/lib/data";
 import { OtTarjeta } from "@/components/ot-tarjeta";
 import { AutoRefresco } from "@/components/auto-refresco";
 import { cx } from "@/components/ui";
+import { SelectorTipo } from "./selector-tipo";
 
 export const dynamic = "force-dynamic";
 
@@ -41,16 +42,21 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
         <span className="text-sm text-slate-500">{ots.length} vehículos en taller</span>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4 md:mx-0 md:px-0">
+      <SelectorTipo
+        valor={tipo?.codigo ?? "todos"}
+        opciones={[{ codigo: "todos", texto: `Todos los tipos (${ots.length})` }, ...tipos.map((tp) => ({ codigo: tp.codigo, texto: `${tp.nombre} (${ots.filter((o) => o.tipoId === tp.id).length})` }))]}
+      />
+      <div className="mb-4 hidden flex-wrap gap-2 sm:flex">
         <PestanaTipo href="/tablero" activa={!tipo} color="#0f172a" texto="Todos" n={ots.length} />
         {tipos.map((tp) => (
           <PestanaTipo key={tp.id} href={`/tablero?tipo=${tp.codigo}`} activa={tipo?.id === tp.id} color={tp.color} texto={tp.nombre} n={ots.filter((o) => o.tipoId === tp.id).length} />
         ))}
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x">
+      {/* Columnas en rejilla (sin scroll horizontal): 1 en el móvil, y tantas como quepan de ~17rem */}
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[repeat(auto-fill,minmax(17rem,1fr))]">
         {columnas.map((c) => (
-          <section key={c.clave} className="w-72 shrink-0 snap-start">
+          <section key={c.clave} aria-label={c.nombre}>
             <header className="flex items-center justify-between mb-2 px-1">
               <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <span className="size-2.5 rounded-full" style={{ background: c.color }} />
@@ -58,7 +64,8 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
               </h2>
               <span className="text-xs font-semibold text-slate-500 bg-slate-200 rounded-full px-2">{c.ots.length}</span>
             </header>
-            <div className="space-y-2 min-h-24 rounded-2xl bg-slate-200/50 p-2">
+            <div className={cx("space-y-2 rounded-2xl bg-slate-200/50 p-2", c.ots.length ? "sm:min-h-24" : "min-h-12")}>
+              {c.ots.length === 0 && <p className="px-2 py-1.5 text-xs text-slate-500">Ninguno</p>}
               {c.ots.map((o) => <OtTarjeta key={o.id} ot={o} mostrarEstado={!tipo} />)}
             </div>
           </section>
@@ -72,7 +79,8 @@ function PestanaTipo({ href, activa, color, texto, n }: { href: string; activa: 
   return (
     <Link
       href={href}
-      className={cx("shrink-0 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium border", activa ? "text-white border-transparent" : "bg-white border-slate-200 text-slate-700")}
+      aria-current={activa ? "page" : undefined}
+      className={cx("inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm font-medium", activa ? "text-white border-transparent" : "bg-white border-slate-200 text-slate-700")}
       style={activa ? { background: color } : undefined}
     >
       {texto}

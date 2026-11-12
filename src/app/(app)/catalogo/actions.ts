@@ -18,7 +18,7 @@ export async function catalogoPersonalizado() {
 const limpiar = (v: string) => v.trim().replace(/\s+/g, " ").slice(0, 60);
 
 export async function crearEnCatalogo(marca: string, modelo?: string): Promise<{ error?: string }> {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("oficina");
   const m = limpiar(marca);
   const mo = modelo ? limpiar(modelo) : null;
   if (m.length < 2 || (modelo !== undefined && (!mo || mo.length < 1))) return { error: "Nombre demasiado corto" };

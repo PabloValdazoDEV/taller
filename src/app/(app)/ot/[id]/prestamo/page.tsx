@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { tiene } from "@/lib/puestos";
 import { requireSesion } from "@/lib/auth";
 import { flotaSustitucion, getOT } from "@/lib/data";
 import { tallerPorId } from "@/lib/taller";
@@ -9,7 +10,7 @@ import { FormularioPrestamo } from "../../../sustitucion/formularios";
 export const dynamic = "force-dynamic";
 
 export default async function Prestamo({ params }: { params: Promise<{ id: string }> }) {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("recepcion");
   const { id } = await params;
   const ot = await getOT(s.tid, id);
   if (!ot) notFound();
@@ -25,12 +26,12 @@ export default async function Prestamo({ params }: { params: Promise<{ id: strin
       </div>
       <FormularioPrestamo
         otId={ot.ot.id}
-        coches={disponibles.map((c) => ({ id: c.id, matricula: c.matricula, marca: c.marca, modelo: c.modelo, km: c.km, combustible: c.combustible }))}
+        coches={disponibles.map((c) => ({ id: c.id, matricula: c.matricula, marca: c.marca, modelo: c.modelo, km: c.km, combustible: c.combustible, danos: c.danos }))}
         conductor={{ nombre: ot.cliente.tipo === "particular" ? ot.cliente.nombre : "", dni: ot.cliente.tipo === "particular" ? ot.cliente.nif ?? "" : "" }}
         pagadorDefecto={ot.ot.datosSiniestro?.cubreSustitucion ? "aseguradora" : "cortesia"}
         edadMin={taller.config.prestamoEdadMinima ?? 25}
         aniosCarnet={taller.config.prestamoAniosCarnet ?? 2}
-        puedeForzar={s.rol !== "asesor"}
+        puedeForzar={tiene(s.puestos, "forzarPrestamo")}
       />
     </div>
   );

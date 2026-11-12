@@ -49,14 +49,20 @@ Enfoque: **MVP primero, con la arquitectura preparada** para las fases siguiente
 
 ---
 
-## 3. Roles y permisos
+## 3. Puestos y permisos
 
-| Rol | Puede |
-|---|---|
-| **Administrador/jefe** | Todo: configuración, usuarios, tipos de orden y flujos, informes, exportaciones, importación de Excel |
-| **Recepcionista/asesor** | Agenda, clientes y vehículos, recepción, presupuestos, comunicación con el cliente, entrega, proforma y cobro |
-| **Jefe de taller** | Tablero, asignación de trabajos a mecánicos, cambio de estados, control de calidad, incidencias |
-| **Mecánico** | Ver sus trabajos asignados, avanzar el estado de su tarea, abrir incidencias con fotos y añadir notas |
+Cada empleado tiene **uno o varios puestos**. Sus permisos y su pantalla de inicio son la suma de los de todos ellos (en un taller pequeño, la misma persona suele hacer recepción, teléfono y facturación).
+
+| Puesto | Puede | Su inicio muestra | Dispositivo principal |
+|---|---|---|---|
+| **Dirección** | Todo, más la configuración: empleados, coches de sustitución, datos del taller, logo y textos legales | Indicadores (entradas/salidas de la semana, retrasos, flota, incidencias) y todos los bloques | PC + móvil |
+| **Recepción** | Agenda, clientes y vehículos, recepción, presupuestos, entrega, coches de sustitución | Citas de hoy, listos para entregar, clientes a llamar | Tablet + PC |
+| **Atención al cliente** | Buscador global, ficha «qué decirle», clientes | Buscador grande, clientes a llamar (retrasados y presupuestos sin confirmar), listos | PC |
+| **Facturación** | Proformas, cobros, exportación al programa de facturación | Entregados recientes (pagador, exento de IVA) | PC |
+| **Jefe de taller** | Tablero, asignación de trabajos, cambio de estados, control de calidad, incidencias, préstamo fuera de condiciones | Sin asignar, parados esperando a terceros, carga por mecánico, incidencias | PC / tablet |
+| **Mecánico** | Ver sus trabajos asignados, avanzar el estado de su tarea, abrir incidencias con fotos y añadir notas | «Mis trabajos» | Móvil |
+
+Los empleados no se borran: se dan de baja (conservan su historial). Debe quedar siempre al menos una persona con el puesto de Dirección.
 
 Todas las acciones relevantes se registran en una **auditoría** (quién, cuándo, qué y desde qué dispositivo).
 

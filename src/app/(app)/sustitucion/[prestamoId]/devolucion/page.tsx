@@ -10,7 +10,7 @@ import { FormularioDevolucion } from "../../formularios";
 export const dynamic = "force-dynamic";
 
 export default async function Devolucion({ params }: { params: Promise<{ prestamoId: string }> }) {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("recepcion");
   const { prestamoId } = await params;
   const [r] = await db
     .select({ p: t.prestamos, coche: t.cochesSustitucion })

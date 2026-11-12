@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db, t } from "@/db";
+import { inicioDe } from "@/lib/puestos";
 import { tallerActual } from "@/lib/taller";
 import { COOKIE_SESION, MAX_AGE_SESION, firmarSesion } from "@/lib/session-token";
 
@@ -30,7 +31,7 @@ export async function entrarConPin(usuarioId: string, pin: string): Promise<{ er
   }
   intentos.delete(usuarioId);
 
-  const token = await firmarSesion({ uid: u.id, tid: taller.id, slug: taller.slug, rol: u.rol, nombre: u.nombre });
+  const token = await firmarSesion({ uid: u.id, tid: taller.id, slug: taller.slug, puestos: u.puestos, nombre: u.nombre });
   (await cookies()).set(COOKIE_SESION, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -38,7 +39,7 @@ export async function entrarConPin(usuarioId: string, pin: string): Promise<{ er
     maxAge: MAX_AGE_SESION,
     path: "/",
   });
-  redirect(u.rol === "mecanico" ? "/mis-trabajos" : "/");
+  redirect(inicioDe(u.puestos));
 }
 
 export async function salir() {

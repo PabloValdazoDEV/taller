@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, Car, CheckCircle2, FileText, History, Image as ImageIcon, MessageCircle, ShieldCheck, Wrench } from "lucide-react";
+import { tiene } from "@/lib/puestos";
 import { requireSesion } from "@/lib/auth";
 import { getOT, mecanicos as listarMecanicos } from "@/lib/data";
 import { tallerPorId } from "@/lib/taller";
@@ -25,7 +26,8 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
   if (!ot) notFound();
   const [mecs, taller] = await Promise.all([listarMecanicos(s.tid), tallerPorId(s.tid)]);
 
-  const esOficina = s.rol !== "mecanico";
+  const esOficina = tiene(s.puestos, "oficina");
+  const gestiona = tiene(s.puestos, "gestionTaller");
   const cerrada = !!ot.ot.cerradaEn;
   const listo = ot.estado.marca === "listo";
   const sin = ot.ot.datosSiniestro;
@@ -127,7 +129,7 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
               actualId={ot.estado.id}
               color={ot.tipo.color}
               puedeElegir={esOficina}
-              cerrada={cerrada || (s.rol === "mecanico" && ot.ot.mecanicoId !== s.uid)}
+              cerrada={cerrada || (!gestiona && ot.ot.mecanicoId !== s.uid)}
             />
           </div>
           <div>

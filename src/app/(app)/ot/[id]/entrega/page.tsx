@@ -10,7 +10,7 @@ import { FormularioEntrega } from "./formulario";
 export const dynamic = "force-dynamic";
 
 export default async function Entrega({ params }: { params: Promise<{ id: string }> }) {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("recepcion");
   const { id } = await params;
   const ot = await getOT(s.tid, id);
   if (!ot) notFound();

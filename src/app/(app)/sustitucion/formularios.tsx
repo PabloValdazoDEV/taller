@@ -8,9 +8,10 @@ import { SiluetaDanos } from "@/components/silueta-danos";
 import { SelectorCombustible } from "@/components/combustible";
 import { PanelFirma } from "@/components/firma";
 import { aniosDesde } from "@/lib/formato";
+import { danosNuevos } from "@/lib/danos";
 import { crearPrestamo, devolverPrestamo } from "./actions";
 
-type Coche = { id: string; matricula: string; marca: string; modelo: string; km: number; combustible: number };
+type Coche = { id: string; matricula: string; marca: string; modelo: string; km: number; combustible: number; danos: Dano[] };
 
 export function FormularioPrestamo(p: {
   otId: string;
@@ -33,7 +34,7 @@ export function FormularioPrestamo(p: {
     combSalida: coche?.combustible ?? 8,
     forzar: false,
   });
-  const [danos, setDanos] = useState<Dano[]>([]);
+  const [danos, setDanos] = useState<Dano[]>(coche?.danos ?? []);
   const [firma, setFirma] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pend, start] = useTransition();
@@ -60,12 +61,13 @@ export function FormularioPrestamo(p: {
               onClick={() => {
                 setCocheId(c.id);
                 setD((x) => ({ ...x, kmSalida: String(c.km), combSalida: c.combustible }));
+                setDanos(c.danos);
               }}
               className={cx("rounded-xl border-2 p-3 text-left", cocheId === c.id ? "border-primary bg-primary/5" : "border-slate-200 bg-white")}
             >
               <div className="font-mono font-bold">{c.matricula}</div>
               <div className="text-sm">{c.marca} {c.modelo}</div>
-              <div className="text-xs text-slate-500">{c.km.toLocaleString("es-ES")} km</div>
+              <div className="text-xs text-slate-500">{c.km.toLocaleString("es-ES")} km · {c.danos.length ? `${c.danos.length} daño(s) registrados` : "sin daños registrados"}</div>
             </button>
           ))}
         </div>
@@ -112,7 +114,10 @@ export function FormularioPrestamo(p: {
           <Campo etiqueta="Km a la salida"><Input inputMode="numeric" value={d.kmSalida} onChange={(e) => set("kmSalida", e.target.value.replace(/\D/g, ""))} /></Campo>
           <div><span className="block text-sm font-medium text-slate-700 mb-1">Combustible</span><SelectorCombustible value={d.combSalida} onChange={(v) => set("combSalida", v)} /></div>
         </div>
-        <span className="block text-sm font-medium text-slate-700">Daños existentes en el coche de sustitución</span>
+        <div>
+          <span className="block text-sm font-medium text-slate-700">Daños del coche de sustitución</span>
+          <span className="block text-xs text-slate-500">Ya vienen marcados los que tiene registrados. Si ves alguno más, márcalo antes de firmar.</span>
+        </div>
         <SiluetaDanos value={danos} onChange={setDanos} />
       </Tarjeta>
 
@@ -150,7 +155,7 @@ export function FormularioDevolucion(p: { prestamoId: string; kmSalida: number; 
   const [firma, setFirma] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pend, start] = useTransition();
-  const nuevos = danos.length - p.danosSalida.length;
+  const nuevos = danosNuevos(p.danosSalida, danos).length;
 
   return (
     <div className="space-y-5">
@@ -166,7 +171,7 @@ export function FormularioDevolucion(p: { prestamoId: string; kmSalida: number; 
         </div>
         <span className="block text-sm font-medium text-slate-700">Daños (los de la salida ya están marcados; añade los nuevos)</span>
         <SiluetaDanos value={danos} onChange={setDanos} />
-        {nuevos > 0 && <p className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3">{nuevos} daño(s) nuevo(s) respecto a la salida.</p>}
+        {nuevos > 0 && <p className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3">{nuevos} daño(s) nuevo(s) respecto a la salida. Quedarán registrados en la ficha del coche.</p>}
         <Campo etiqueta="Observaciones"><Textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} /></Campo>
       </Tarjeta>
       <Tarjeta className="p-4 md:p-6 space-y-4">

@@ -15,7 +15,7 @@ const Esquema = z.object({
 });
 
 export async function actualizarCliente(fd: FormData): Promise<{ error?: string }> {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("clientes");
   const id = String(fd.get("id"));
   const datos = {
     tipo: String(fd.get("tipo")) as (typeof t.tipoClienteEnum.enumValues)[number],

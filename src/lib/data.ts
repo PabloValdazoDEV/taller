@@ -128,7 +128,7 @@ export async function mecanicos(tid: string) {
   return db
     .select({ id: t.usuarios.id, nombre: t.usuarios.nombre, color: t.usuarios.color })
     .from(t.usuarios)
-    .where(and(eq(t.usuarios.tallerId, tid), eq(t.usuarios.rol, "mecanico"), eq(t.usuarios.activo, true)))
+    .where(and(eq(t.usuarios.tallerId, tid), sql`${"mecanico"} = any(${t.usuarios.puestos})`, eq(t.usuarios.activo, true)))
     .orderBy(asc(t.usuarios.nombre));
 }
 
@@ -154,7 +154,11 @@ export async function citasDelDia(tid: string, dia = new Date()) {
 }
 
 export async function flotaSustitucion(tid: string) {
-  const coches = await db.select().from(t.cochesSustitucion).where(eq(t.cochesSustitucion.tallerId, tid)).orderBy(asc(t.cochesSustitucion.matricula));
+  const coches = await db
+    .select()
+    .from(t.cochesSustitucion)
+    .where(and(eq(t.cochesSustitucion.tallerId, tid), eq(t.cochesSustitucion.activo, true)))
+    .orderBy(asc(t.cochesSustitucion.matricula));
   const activos = await db
     .select({ p: t.prestamos, otNumero: t.ordenesTrabajo.numero, otId: t.ordenesTrabajo.id })
     .from(t.prestamos)
@@ -278,3 +282,159 @@ export async function getCliente(tid: string, id: string) {
   return { cliente, esCompania, vehiculos, ordenes, documentos, fotosPorOt: Object.fromEntries(fotos.map((f) => [f.otId, f.n])) };
 }
 export type ClienteDetalle = NonNullable<Awaited<ReturnType<typeof getCliente>>>;
+
+// ───────────────────────── Configuración ─────────────────────────
+
+export async function listarEmpleados(tid: string) {
+  const U = sql.raw(`"usuarios"."id"`);
+  return db
+    .select({
+      id: t.usuarios.id,
+      nombre: t.usuarios.nombre,
+      color: t.usuarios.color,
+      puestos: t.usuarios.puestos,
+      activo: t.usuarios.activo,
+      trabajosAbiertos: sql<number>`(select count(*)::int from ordenes_trabajo o where o.mecanico_id = ${U} and o.cerrada_en is null)`,
+    })
+    .from(t.usuarios)
+    .where(eq(t.usuarios.tallerId, tid))
+    .orderBy(desc(t.usuarios.activo), asc(t.usuarios.nombre));
+}
+export type Empleado = Awaited<ReturnType<typeof listarEmpleados>>[number];
+
+export async function listarCochesConfig(tid: string) {
+  const C = sql.raw(`"coches_sustitucion"."id"`);
+  return db
+    .select({
+      coche: t.cochesSustitucion,
+      prestamos: sql<number>`(select count(*)::int from prestamos p where p.coche_id = ${C})`,
+      ultimoPrestamo: sql<Date | null>`(select max(p.salida_en) from prestamos p where p.coche_id = ${C})`,
+    })
+    .from(t.cochesSustitucion)
+    .where(eq(t.cochesSustitucion.tallerId, tid))
+    .orderBy(desc(t.cochesSustitucion.activo), asc(t.cochesSustitucion.matricula));
+}
+export type CocheConfig = Awaited<ReturnType<typeof listarCochesConfig>>[number];
+
+// ───────────────────────── Inicio por puestos ─────────────────────────
+
+/** Vehículos entregados en los últimos `dias` (para facturación / dirección). */
+export async function entregadosRecientes(tid: string, dias = 7) {
+  const desde = new Date(Date.now() - dias * 86400_000);
+  return db
+    .select({
+      id: t.ordenesTrabajo.id,
+      numero: t.ordenesTrabajo.numero,
+      cerradaEn: t.ordenesTrabajo.cerradaEn,
+      datosSiniestro: t.ordenesTrabajo.datosSiniestro,
+      tipoNombre: t.tiposOrden.nombre,
+      tipoColor: t.tiposOrden.color,
+      clienteNombre: t.clientes.nombre,
+      clienteExento: t.clientes.exentoIva,
+      matricula: t.vehiculos.matricula,
+      marca: t.vehiculos.marca,
+      modelo: t.vehiculos.modelo,
+    })
+    .from(t.ordenesTrabajo)
+    .innerJoin(t.tiposOrden, eq(t.tiposOrden.id, t.ordenesTrabajo.tipoOrdenId))
+    .innerJoin(t.clientes, eq(t.clientes.id, t.ordenesTrabajo.clienteId))
+    .innerJoin(t.vehiculos, eq(t.vehiculos.id, t.ordenesTrabajo.vehiculoId))
+    .where(and(eq(t.ordenesTrabajo.tallerId, tid), gte(t.ordenesTrabajo.cerradaEn, desde)))
+    .orderBy(desc(t.ordenesTrabajo.cerradaEn));
+}
+
+/** Entradas y salidas desde el lunes de esta semana. */
+export async function actividadSemana(tid: string) {
+  const lunes = new Date();
+  lunes.setHours(0, 0, 0, 0);
+  lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
+  const [r] = await db
+    .select({
+      entradas: sql<number>`count(*) filter (where ${t.ordenesTrabajo.fechaEntrada} >= ${lunes.toISOString()})::int`,
+      salidas: sql<number>`count(*) filter (where ${t.ordenesTrabajo.cerradaEn} >= ${lunes.toISOString()})::int`,
+    })
+    .from(t.ordenesTrabajo)
+    .where(eq(t.ordenesTrabajo.tallerId, tid));
+  return r;
+}
+
+/** Incidencias abiertas con su orden (para el jefe de taller / dirección). */
+export async function incidenciasAbiertas(tid: string) {
+  return db
+    .select({
+      id: t.incidencias.id,
+      tipo: t.incidencias.tipo,
+      descripcion: t.incidencias.descripcion,
+      creadaEn: t.incidencias.creadaEn,
+      otId: t.ordenesTrabajo.id,
+      otNumero: t.ordenesTrabajo.numero,
+      matricula: t.vehiculos.matricula,
+    })
+    .from(t.incidencias)
+    .innerJoin(t.ordenesTrabajo, eq(t.ordenesTrabajo.id, t.incidencias.otId))
+    .innerJoin(t.vehiculos, eq(t.vehiculos.id, t.ordenesTrabajo.vehiculoId))
+    .where(and(eq(t.incidencias.tallerId, tid), inArray(t.incidencias.estado, ["abierta", "en_curso"])))
+    .orderBy(asc(t.incidencias.creadaEn));
+}
+
+/**
+ * Buscador global (atención telefónica): matrícula, teléfono, nombre, NIF o nº de orden.
+ * Devuelve las órdenes (abiertas primero) y los clientes que coinciden.
+ */
+export async function buscarGlobal(tid: string, q: string) {
+  const texto = q.trim();
+  if (texto.length < 2) return { ordenes: [], clientes: [] };
+  const patron = `%${texto.replace(/[%_]/g, "")}%`;
+  const compacto = texto.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const digitos = texto.replace(/\D/g, "");
+
+  const coincide = sql`(
+    replace(upper(${t.vehiculos.matricula}), ' ', '') like ${"%" + compacto + "%"}
+    or ${t.clientes.nombre} ilike ${patron}
+    or ${t.clientes.nif} ilike ${patron}
+    or ${t.ordenesTrabajo.numero} ilike ${patron}
+    ${digitos.length >= 6 ? sql`or regexp_replace(coalesce(${t.clientes.telefono}, ''), '\\D', '', 'g') like ${"%" + digitos + "%"}` : sql``}
+    or (${t.ordenesTrabajo.datosSiniestro}->>'numeroSiniestro') ilike ${patron}
+  )`;
+
+  const ordenes = await db
+    .select({
+      id: t.ordenesTrabajo.id,
+      numero: t.ordenesTrabajo.numero,
+      trabajo: t.ordenesTrabajo.trabajoSolicitado,
+      fechaEntrada: t.ordenesTrabajo.fechaEntrada,
+      fechaPrevista: t.ordenesTrabajo.fechaPrevista,
+      cerradaEn: t.ordenesTrabajo.cerradaEn,
+      actualizadaEn: t.ordenesTrabajo.actualizadaEn,
+      datosSiniestro: t.ordenesTrabajo.datosSiniestro,
+      tipoNombre: t.tiposOrden.nombre,
+      tipoColor: t.tiposOrden.color,
+      estadoNombre: t.estadosFlujo.nombre,
+      estadoMarca: t.estadosFlujo.marca,
+      requiereAprobacion: t.estadosFlujo.requiereAprobacion,
+      clienteId: t.clientes.id,
+      clienteNombre: t.clientes.nombre,
+      clienteTelefono: t.clientes.telefono,
+      matricula: t.vehiculos.matricula,
+      marca: t.vehiculos.marca,
+      modelo: t.vehiculos.modelo,
+      mecanicoNombre: mecanico.nombre,
+      incidenciasCliente: sql<{ tipo: string; descripcion: string; nuevaFecha: string | null }[]>`coalesce((
+        select json_agg(json_build_object('tipo', i.tipo, 'descripcion', i.descripcion, 'nuevaFecha', i.nueva_fecha) order by i.creada_en)
+        from incidencias i where i.ot_id = ${t.ordenesTrabajo.id} and i.visible_cliente and i.estado in ('abierta', 'en_curso')
+      ), '[]'::json)`,
+    })
+    .from(t.ordenesTrabajo)
+    .innerJoin(t.tiposOrden, eq(t.tiposOrden.id, t.ordenesTrabajo.tipoOrdenId))
+    .innerJoin(t.estadosFlujo, eq(t.estadosFlujo.id, t.ordenesTrabajo.estadoId))
+    .innerJoin(t.clientes, eq(t.clientes.id, t.ordenesTrabajo.clienteId))
+    .innerJoin(t.vehiculos, eq(t.vehiculos.id, t.ordenesTrabajo.vehiculoId))
+    .leftJoin(mecanico, eq(mecanico.id, t.ordenesTrabajo.mecanicoId))
+    .where(and(eq(t.ordenesTrabajo.tallerId, tid), coincide))
+    .orderBy(sql`${t.ordenesTrabajo.cerradaEn} is not null`, desc(t.ordenesTrabajo.fechaEntrada))
+    .limit(20);
+
+  const clientes = (await listarClientes(tid, texto)).slice(0, 10);
+  return { ordenes, clientes };
+}
+export type ResultadoBusqueda = Awaited<ReturnType<typeof buscarGlobal>>;

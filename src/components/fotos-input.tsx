@@ -24,10 +24,13 @@ export async function comprimirImagen(f: File, max = 1600, calidad = 0.8): Promi
  * así funciona dentro de cualquier <form> con server actions.
  * Si se pasa onChange, además informa de los ficheros (para formularios controlados).
  */
-export function FotosInput({ name = "fotos", onChange, texto = "Hacer foto" }: { name?: string; onChange?: (f: File[]) => void; texto?: string }) {
+export function FotosInput({ name = "fotos", onChange, texto = "Hacer foto", inicial }: { name?: string; onChange?: (f: File[]) => void; texto?: string; inicial?: File[] }) {
   const camara = useRef<HTMLInputElement>(null);
   const real = useRef<HTMLInputElement>(null);
-  const [fotos, setFotos] = useState<{ file: File; url: string }[]>([]);
+  // `inicial` permite volver a este paso de un asistente sin perder las fotos ya hechas.
+  const [fotos, setFotos] = useState<{ file: File; url: string }[]>(() => (inicial ?? []).map((file) => ({ file, url: URL.createObjectURL(file) })));
+  const actuales = useRef(fotos);
+  actuales.current = fotos;
   const [procesando, setProcesando] = useState(false);
 
   useEffect(() => {
@@ -38,7 +41,15 @@ export function FotosInput({ name = "fotos", onChange, texto = "Hacer foto" }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fotos]);
 
-  useEffect(() => () => fotos.forEach((f) => URL.revokeObjectURL(f.url)), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Libera las vistas previas al desmontar. Se aplaza para no romperlas en el doble montaje de React en desarrollo.
+  const montado = useRef(false);
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+      setTimeout(() => !montado.current && actuales.current.forEach((f) => URL.revokeObjectURL(f.url)), 0);
+    };
+  }, []);
 
   async function añadir(lista: FileList | null) {
     if (!lista?.length) return;
@@ -64,7 +75,10 @@ export function FotosInput({ name = "fotos", onChange, texto = "Hacer foto" }: {
             <button
               type="button"
               aria-label="Quitar foto"
-              onClick={() => setFotos((p) => p.filter((_, j) => j !== i))}
+              onClick={() => {
+                URL.revokeObjectURL(f.url);
+                setFotos((p) => p.filter((_, j) => j !== i));
+              }}
               className="absolute top-1 right-1 size-7 grid place-items-center rounded-full bg-black/60 text-white"
             >
               <X className="size-4" />

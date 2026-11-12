@@ -3,6 +3,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, t } from "@/db";
+import { tiene } from "@/lib/puestos";
 import { requireSesion } from "@/lib/auth";
 import { auditar } from "@/lib/auditoria";
 import { guardarFotos } from "@/lib/fotos";
@@ -25,14 +26,14 @@ export async function cambiarEstado(otId: string, estadoId: string | null, comen
   const s = await requireSesion();
   const { ot, estados } = await cargarOT(s.tid, otId);
   if (ot.cerradaEn) return { error: "La orden ya está cerrada" };
-  if (s.rol === "mecanico" && ot.mecanicoId !== s.uid) return { error: "Solo puedes mover tus propios trabajos" };
+  if (!tiene(s.puestos, "gestionTaller") && ot.mecanicoId !== s.uid) return { error: "Solo puedes mover tus propios trabajos" };
 
   const actual = estados.find((e) => e.id === ot.estadoId)!;
   // estadoId null = avanzar al siguiente
   const destino = estadoId ? estados.find((e) => e.id === estadoId) : estados.find((e) => e.orden > actual.orden);
   if (!destino) return { error: "No hay estado siguiente" };
   if (destino.marca === "final") return { error: "Para entregar el vehículo usa «Entregar» (requiere firma)" };
-  if (s.rol === "mecanico" && destino.orden < actual.orden) return { error: "Pide al jefe de taller que retroceda el estado" };
+  if (!tiene(s.puestos, "gestionTaller") && destino.orden < actual.orden) return { error: "Pide al jefe de taller que retroceda el estado" };
 
   await db.transaction(async (tx) => {
     await tx.update(t.ordenesTrabajo).set({ estadoId: destino.id, actualizadaEn: new Date() }).where(eq(t.ordenesTrabajo.id, ot.id));
@@ -44,7 +45,7 @@ export async function cambiarEstado(otId: string, estadoId: string | null, comen
 }
 
 export async function asignarMecanico(otId: string, mecanicoId: string | null): Promise<R> {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("gestionTaller");
   const { ot } = await cargarOT(s.tid, otId);
   if (mecanicoId) {
     const m = await db.query.usuarios.findFirst({ where: and(eq(t.usuarios.tallerId, s.tid), eq(t.usuarios.id, mecanicoId)) });
@@ -89,7 +90,7 @@ export async function crearIncidencia(fd: FormData): Promise<R> {
 }
 
 export async function resolverIncidencia(incidenciaId: string, resolucion: string, descartar = false): Promise<R> {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("gestionTaller");
   const inc = await db.query.incidencias.findFirst({ where: and(eq(t.incidencias.tallerId, s.tid), eq(t.incidencias.id, incidenciaId)) });
   if (!inc) return { error: "Incidencia no encontrada" };
   await db

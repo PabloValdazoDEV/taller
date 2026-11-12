@@ -2,11 +2,12 @@
 import "./env"; // debe ir primero: carga DATABASE_URL antes de importar la BD
 
 import bcrypt from "bcryptjs";
-import { rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { eq, inArray } from "drizzle-orm";
 import { db, t } from "../src/db";
 import { FLUJOS_BASE, TEXTOS_LEGALES_BASE } from "../src/lib/flujos-base";
+import type { Puesto } from "../src/lib/puestos";
 
 const SLUG = process.env.DEFAULT_TALLER_SLUG ?? "valrodri";
 
@@ -48,21 +49,29 @@ async function main() {
       whatsapp: "680 77 29 49",
       email: "talleresvalrodri@hotmail.com",
       colorPrimario: "#c2410c",
-      config: TEXTOS_LEGALES_BASE,
+      config: { ...TEXTOS_LEGALES_BASE, horario: "L-V 8:30-14:00 y 15:00-18:00" },
     })
     .returning();
   const tid = taller.id;
 
+  // Logo de demostración (el taller lo cambia desde Configuración → Datos del taller)
+  const logoRuta = path.join(tid, "logo", "logo-demo.png");
+  const logoAbs = path.resolve(process.env.STORAGE_DIR ?? "./storage", logoRuta);
+  await mkdir(path.dirname(logoAbs), { recursive: true });
+  await writeFile(logoAbs, await readFile(path.resolve("scripts/demo/logo-valrodri.png")));
+  await db.update(t.talleres).set({ logoRuta }).where(eq(t.talleres.id, tid));
+
   // Usuarios (PIN entre paréntesis — solo demo)
   const usuariosDef = [
-    { nombre: "Pablo", rol: "admin", pin: "1234", color: "#0f172a" },
-    { nombre: "Laura", rol: "asesor", pin: "1111", color: "#c2410c" },
-    { nombre: "Javier", rol: "jefe_taller", pin: "2222", color: "#1d4ed8" },
-    { nombre: "Rubén", rol: "mecanico", pin: "3333", color: "#15803d" },
-    { nombre: "Sergio", rol: "mecanico", pin: "4444", color: "#7c3aed" },
-    { nombre: "Iván (chapa)", rol: "mecanico", pin: "5555", color: "#b45309" },
-    { nombre: "Marta (pintura)", rol: "mecanico", pin: "6666", color: "#db2777" },
-  ] as const;
+    { nombre: "Pablo", puestos: ["direccion"], pin: "1234", color: "#0f172a" },
+    { nombre: "Laura", puestos: ["recepcion", "telefono"], pin: "1111", color: "#c2410c" },
+    { nombre: "Carmen", puestos: ["facturacion", "telefono"], pin: "7777", color: "#0f766e" },
+    { nombre: "Javier", puestos: ["jefe_taller"], pin: "2222", color: "#1d4ed8" },
+    { nombre: "Rubén", puestos: ["mecanico"], pin: "3333", color: "#15803d" },
+    { nombre: "Sergio", puestos: ["mecanico"], pin: "4444", color: "#7c3aed" },
+    { nombre: "Iván (chapa)", puestos: ["mecanico"], pin: "5555", color: "#b45309" },
+    { nombre: "Marta (pintura)", puestos: ["mecanico"], pin: "6666", color: "#be185d" },
+  ] satisfies { nombre: string; puestos: Puesto[]; pin: string; color: string }[];
   const usuarios = await db
     .insert(t.usuarios)
     .values(
@@ -70,7 +79,7 @@ async function main() {
         usuariosDef.map(async (u) => ({
           tallerId: tid,
           nombre: u.nombre,
-          rol: u.rol,
+          puestos: u.puestos,
           color: u.color,
           pinHash: await bcrypt.hash(u.pin, 10),
         })),
@@ -231,7 +240,8 @@ async function main() {
 
   // Coches de sustitución
   await db.insert(t.cochesSustitucion).values([
-    { tallerId: tid, matricula: "4321 LKJ", marca: "Seat", modelo: "Ibiza", km: 45210, itvHasta: iso(diasDesdeHoy(300)), seguroHasta: iso(diasDesdeHoy(200)) },
+    { tallerId: tid, matricula: "4321 LKJ", marca: "Seat", modelo: "Ibiza", km: 45210, itvHasta: iso(diasDesdeHoy(300)), seguroHasta: iso(diasDesdeHoy(200)),
+      danos: [{ x: 50, y: 80, tipo: "Arañazo", vista: "trasera" as const, nota: "Paragolpes trasero, ya estaba al comprarlo" }] },
     { tallerId: tid, matricula: "8765 LMN", marca: "Dacia", modelo: "Sandero", km: 23890, itvHasta: iso(diasDesdeHoy(500)), seguroHasta: iso(diasDesdeHoy(200)) },
   ]);
 
@@ -244,7 +254,7 @@ async function main() {
 
   void inArray; void otraAseg;
   console.log(`✔ Taller demo "${taller.nombre}" (${SLUG}) creado con ${ots.length} órdenes.`);
-  console.log("  PINs: Pablo 1234 · Laura 1111 · Javier 2222 · Rubén 3333 · Sergio 4444 · Iván 5555 · Marta 6666");
+  console.log("  PINs: Pablo 1234 · Laura 1111 · Carmen 7777 · Javier 2222 · Rubén 3333 · Sergio 4444 · Iván 5555 · Marta 6666");
   process.exit(0);
 }
 

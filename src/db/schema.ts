@@ -14,6 +14,7 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { Puesto } from "@/lib/puestos";
 
 /*
  * Multi-taller: todas las tablas de negocio llevan taller_id.
@@ -21,7 +22,6 @@ import { sql } from "drizzle-orm";
  * Pendiente (fase 0 de producción): políticas Row Level Security en PostgreSQL.
  */
 
-export const rolEnum = pgEnum("rol", ["admin", "asesor", "jefe_taller", "mecanico"]);
 export const tipoClienteEnum = pgEnum("tipo_cliente", ["particular", "empresa", "aseguradora", "flota"]);
 export const tipoIncidenciaEnum = pgEnum("tipo_incidencia", [
   "averia_adicional",
@@ -59,6 +59,8 @@ export const talleres = pgTable("talleres", {
   whatsapp: text("whatsapp"),
   email: text("email"),
   logoRuta: text("logo_ruta"),
+  /** Sello o firma del taller: se estampa en el recuadro «Por el taller» de los PDF. Privado (no se sirve sin sesión). */
+  selloRuta: text("sello_ruta"),
   colorPrimario: text("color_primario").notNull().default("#1d4ed8"),
   ivaDefecto: numeric("iva_defecto").notNull().default("21"),
   /** textos legales, condiciones de préstamo, etc. */
@@ -73,6 +75,8 @@ export type TallerConfig = {
   garantiaTexto?: string;
   prestamoEdadMinima?: number;
   prestamoAniosCarnet?: number;
+  /** Horario de atención, se usa en los mensajes al cliente */
+  horario?: string;
 };
 
 export const usuarios = pgTable(
@@ -84,7 +88,8 @@ export const usuarios = pgTable(
     email: text("email"),
     passwordHash: text("password_hash"),
     pinHash: text("pin_hash").notNull(),
-    rol: rolEnum("rol").notNull(),
+    /** Puestos combinables (ver src/lib/puestos.ts) */
+    puestos: text("puestos").array().$type<Puesto[]>().notNull().default(sql`'{}'::text[]`),
     color: text("color").notNull().default("#64748b"),
     activo: boolean("activo").notNull().default(true),
   },
@@ -323,6 +328,10 @@ export const cochesSustitucion = pgTable("coches_sustitucion", {
   itvHasta: date("itv_hasta"),
   seguroHasta: date("seguro_hasta"),
   notas: text("notas"),
+  /** Daños actuales conocidos del coche: se precargan al prestarlo y se actualizan con cada devolución */
+  danos: jsonb("danos").$type<Dano[]>().notNull().default([]),
+  /** false = dado de baja (se conserva por su historial de préstamos) */
+  activo: boolean("activo").notNull().default(true),
 });
 
 export const prestamos = pgTable("prestamos", {

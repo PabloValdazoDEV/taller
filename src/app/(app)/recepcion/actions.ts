@@ -16,7 +16,7 @@ import { fotosComoDataUrl, guardarDocumento, prepararEvidencia, tallerParaPdf, v
 import { ResguardoPdf } from "@/lib/pdf/plantillas";
 
 export async function buscarPorMatricula(matricula: string) {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("recepcion");
   const r = await buscarVehiculo(s.tid, matricula);
   if (!r) return null;
   // ¿Ya está en el taller?
@@ -69,7 +69,7 @@ const Esquema = z.object({
 });
 
 export async function crearRecepcion(fd: FormData): Promise<{ error?: string }> {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("recepcion");
   const firma = validarFirma(fd.get("firma"));
   if (!firma) return { error: "Falta la firma del cliente" };
 
@@ -191,7 +191,7 @@ export async function crearRecepcion(fd: FormData): Promise<{ error?: string }> 
       "resguardo",
       otId.ot.id,
       ResguardoPdf({
-        taller: tallerParaPdf(taller),
+        taller: await tallerParaPdf(taller),
         evidencia: ev,
         numeroOT: otId.numero,
         tipoOrden: tipo.nombre,

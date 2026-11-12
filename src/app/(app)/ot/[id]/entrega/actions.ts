@@ -14,7 +14,7 @@ import { guardarFotos } from "@/lib/fotos";
 import { EntregaPdf } from "@/lib/pdf/plantillas";
 
 export async function registrarEntrega(fd: FormData): Promise<{ error?: string }> {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("recepcion");
   const otId = String(fd.get("otId"));
   const ot = await getOT(s.tid, otId);
   if (!ot) return { error: "Orden no encontrada" };
@@ -51,7 +51,7 @@ export async function registrarEntrega(fd: FormData): Promise<{ error?: string }
       "entrega",
       otId,
       EntregaPdf({
-        taller: tallerParaPdf(taller),
+        taller: await tallerParaPdf(taller),
         evidencia: ev,
         numeroOT: ot.ot.numero,
         tipoOrden: ot.tipo.nombre,

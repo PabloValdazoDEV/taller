@@ -7,7 +7,7 @@ import { AsistenteRecepcion, type Prefill } from "./asistente";
 export const dynamic = "force-dynamic";
 
 export default async function NuevaRecepcion({ searchParams }: { searchParams: Promise<{ cita?: string; matricula?: string }> }) {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("recepcion");
   const { cita: citaId, matricula } = await searchParams;
   const [tipos, companias] = await Promise.all([tiposConEstados(s.tid), compania(s.tid)]);
 

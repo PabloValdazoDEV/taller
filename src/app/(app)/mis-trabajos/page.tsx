@@ -1,3 +1,4 @@
+import { tiene } from "@/lib/puestos";
 import { requireSesion } from "@/lib/auth";
 import { listarOTsAbiertas, tiposConEstados, type OTResumen } from "@/lib/data";
 import { OtTarjeta } from "@/components/ot-tarjeta";
@@ -8,8 +9,8 @@ import { AvanzarRapido } from "./avanzar";
 export const dynamic = "force-dynamic";
 
 export default async function MisTrabajos() {
-  const s = await requireSesion(["mecanico", "jefe_taller", "admin"]);
-  const [mias, todas, tipos] = await Promise.all([listarOTsAbiertas(s.tid, { mecanicoId: s.uid }), s.rol !== "mecanico" ? listarOTsAbiertas(s.tid) : Promise.resolve([]), tiposConEstados(s.tid)]);
+  const s = await requireSesion("misTrabajos");
+  const [mias, todas, tipos] = await Promise.all([listarOTsAbiertas(s.tid, { mecanicoId: s.uid }), tiene(s.puestos, "gestionTaller") ? listarOTsAbiertas(s.tid) : Promise.resolve([]), tiposConEstados(s.tid)]);
   const sinAsignar = todas.filter((o) => !o.mecanicoId);
 
   const siguienteDe = (o: OTResumen) => {

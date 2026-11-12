@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Loader2, Pencil, Search } from "lucide-react";
 import type { Dano } from "@/db/schema";
 import { Boton, Campo, Input, Matricula, Select, Tarjeta, Textarea, cx } from "@/components/ui";
 import { SiluetaDanos, VistasDanos } from "@/components/silueta-danos";
@@ -60,6 +60,8 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
   });
   const [fotos, setFotos] = useState<File[]>([]);
   const [firma, setFirma] = useState<string | null>(null);
+  // Si se vuelve desde la firma para corregir algo, se ofrece regresar directamente a ella.
+  const [desdeFirma, setDesdeFirma] = useState(false);
 
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((p) => ({ ...p, [k]: v }));
   const tipoSel = tipos.find((tp) => tp.id === d.tipoOrdenId);
@@ -121,13 +123,37 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
     return "";
   }
 
+  function irA(p: number) {
+    setError("");
+    // La firma da conformidad a los datos: si se vuelve a corregir algo, el cliente firma de nuevo.
+    if (paso === PASOS.length - 1 && p < paso) {
+      setFirma(null);
+      setDesdeFirma(true);
+    }
+    if (p === PASOS.length - 1) {
+      setDesdeFirma(false);
+      if (!d.firmante) set("firmante", d.clienteNombre);
+    }
+    setPaso(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function siguiente() {
     const e = validar(paso);
     if (e) return setError(e);
-    setError("");
-    if (paso === 3 && !d.firmante) set("firmante", d.clienteNombre);
-    setPaso((p) => Math.min(p + 1, PASOS.length - 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    irA(Math.min(paso + 1, PASOS.length - 1));
+  }
+
+  /** Vuelve a «Revisión y firma» comprobando todos los pasos; si alguno está incompleto, se queda en él. */
+  function volverAFirma() {
+    for (let p = 0; p < PASOS.length - 1; p++) {
+      const e = validar(p);
+      if (e) {
+        if (p !== paso) irA(p);
+        return setError(e);
+      }
+    }
+    irA(PASOS.length - 1);
   }
 
   function enviar() {
@@ -153,14 +179,23 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Indicador de pasos */}
-      <ol className="flex items-center gap-1 mb-6 overflow-x-auto">
+      {/* Indicador de pasos: en el móvil, «Paso X de N» + barra; en tablet/PC, todos los pasos */}
+      <div className="mb-5 sm:hidden" aria-live="polite">
+        <div className="flex items-baseline justify-between gap-3 text-sm">
+          <span className="font-semibold text-slate-900">{PASOS[paso]}</span>
+          <span className="shrink-0 text-slate-500">Paso {paso + 1} de {PASOS.length}</span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuemin={1} aria-valuemax={PASOS.length} aria-valuenow={paso + 1} aria-label="Progreso de la recepción">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${((paso + 1) / PASOS.length) * 100}%` }} />
+        </div>
+      </div>
+      <ol className="mb-6 hidden flex-wrap items-center gap-1 sm:flex">
         {PASOS.map((nombre, i) => (
           <li key={nombre} className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               disabled={i > paso}
-              onClick={() => i < paso && setPaso(i)}
+              onClick={() => i < paso && irA(i)}
               className={cx(
                 "flex items-center gap-2 rounded-full pl-1 pr-3 py-1 text-sm",
                 i === paso ? "bg-primary text-white font-semibold" : i < paso ? "bg-white text-slate-700 border border-slate-200" : "text-slate-400",
@@ -169,7 +204,7 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
               <span className={cx("size-6 rounded-full grid place-items-center text-xs font-bold", i === paso ? "bg-white/25" : i < paso ? "bg-emerald-500 text-white" : "bg-slate-200")}>
                 {i < paso ? <Check className="size-3.5" /> : i + 1}
               </span>
-              <span className={cx(i !== paso && "hidden sm:inline")}>{nombre}</span>
+              <span>{nombre}</span>
             </button>
             {i < PASOS.length - 1 && <ChevronRight className="size-4 text-slate-300" />}
           </li>
@@ -309,36 +344,38 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
         {paso === 3 && (
           <div className="space-y-3">
             <p className="text-sm text-slate-600">Haz fotos de los cuatro lados, del cuadro (km) y de cada daño marcado. Se comprimen automáticamente antes de subirlas.</p>
-            <FotosInput onChange={setFotos} />
+            <FotosInput inicial={fotos} onChange={setFotos} />
           </div>
         )}
 
         {paso === 4 && (
           <div className="space-y-6">
-            <div className="grid md:grid-cols-[1fr_280px] gap-6">
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                <dt className="text-slate-500">Vehículo</dt>
-                <dd className="flex items-center gap-2 flex-wrap"><Matricula>{d.matricula}</Matricula>{d.marca && <LogoMarca marca={d.marca} className="size-6" />} {d.marca} {d.modelo}</dd>
-                <dt className="text-slate-500">Cliente</dt>
-                <dd>{d.clienteNombre} {d.clienteTelefono && `· ${d.clienteTelefono}`}</dd>
-                <dt className="text-slate-500">Tipo</dt>
-                <dd>{tipoSel?.nombre}{d.siniestro.numeroSiniestro && tipoSel?.requiereSiniestro ? ` · ${companias.find((c) => c.id === d.siniestro.companiaId)?.nombre} ${d.siniestro.numeroSiniestro}` : ""}</dd>
-                <dt className="text-slate-500">Trabajo</dt>
-                <dd>{d.trabajo}</dd>
-                <dt className="text-slate-500">Km / comb.</dt>
-                <dd>{Number(d.km).toLocaleString("es-ES")} km · {fmtCombustible(d.combustible)}</dd>
-                <dt className="text-slate-500">Testigos</dt>
-                <dd>{d.testigos.join(", ") || "Ninguno"}</dd>
-                <dt className="text-slate-500">Objetos</dt>
-                <dd>{d.objetos.join(", ") || "Ninguno"}</dd>
-                <dt className="text-slate-500">Daños</dt>
-                <dd>{d.danos.length ? d.danos.map((x, i) => `${i + 1}. ${x.tipo} (${zonaDano(x)})`).join(" · ") : "Sin daños"}</dd>
-                <dt className="text-slate-500">Fotos</dt>
-                <dd>{fotos.length}</dd>
-                <dt className="text-slate-500">Presupuesto</dt>
-                <dd>{d.renunciaPresupuesto ? "Renuncia a presupuesto previo" : "Se facilitará presupuesto"}</dd>
-              </dl>
-              <VistasDanos danos={d.danos} />
+            <p className="rounded-xl bg-sky-50 p-3 text-sm text-sky-900">
+              Revisa los datos con el cliente antes de firmar. Si falta algo (una foto, un daño, un objeto…), pulsa <b>Cambiar</b> en ese bloque.
+            </p>
+            <div className={cx("grid gap-4", d.danos.length > 0 && "md:grid-cols-[1fr_280px]")}>
+              <div className="space-y-3">
+                <BloqueRevision titulo={PASOS[0]} onCambiar={() => irA(0)}>
+                  <Fila t="Vehículo"><span className="inline-flex flex-wrap items-center gap-2"><Matricula>{d.matricula}</Matricula>{d.marca && <LogoMarca marca={d.marca} className="size-6" />} {d.marca} {d.modelo}</span></Fila>
+                  <Fila t="Cliente">{d.clienteNombre} {d.clienteTelefono && `· ${d.clienteTelefono}`}</Fila>
+                </BloqueRevision>
+                <BloqueRevision titulo={PASOS[1]} onCambiar={() => irA(1)}>
+                  <Fila t="Tipo">{tipoSel?.nombre}{d.siniestro.numeroSiniestro && tipoSel?.requiereSiniestro ? ` · ${companias.find((c) => c.id === d.siniestro.companiaId)?.nombre} ${d.siniestro.numeroSiniestro}` : ""}</Fila>
+                  <Fila t="Trabajo"><span className="whitespace-pre-line">{d.trabajo}</span></Fila>
+                  <Fila t="Presupuesto">{d.renunciaPresupuesto ? "Renuncia a presupuesto previo" : "Se facilitará presupuesto"}</Fila>
+                </BloqueRevision>
+                <BloqueRevision titulo={PASOS[2]} onCambiar={() => irA(2)}>
+                  <Fila t="Km / comb.">{Number(d.km).toLocaleString("es-ES")} km · {fmtCombustible(d.combustible)}</Fila>
+                  <Fila t="Testigos">{d.testigos.join(", ") || "Ninguno"}</Fila>
+                  <Fila t="Objetos">{d.objetos.join(", ") || "Ninguno"}</Fila>
+                  <Fila t="Daños">{d.danos.length ? d.danos.map((x, i) => `${i + 1}. ${x.tipo} (${zonaDano(x)})`).join(" · ") : "Sin daños"}</Fila>
+                  {d.observaciones && <Fila t="Observ.">{d.observaciones}</Fila>}
+                </BloqueRevision>
+                <BloqueRevision titulo={PASOS[3]} onCambiar={() => irA(3)} sinLista>
+                  {fotos.length ? <Miniaturas fotos={fotos} /> : <p className="text-sm text-amber-700">No se ha hecho ninguna foto.</p>}
+                </BloqueRevision>
+              </div>
+              {d.danos.length > 0 && <VistasDanos danos={d.danos} />}
             </div>
             <div className="rounded-xl bg-slate-50 p-4 space-y-4 border border-slate-200">
               <p className="text-sm text-slate-600">
@@ -355,10 +392,14 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
         )}
 
         <div className="mt-6 flex justify-between gap-3">
-          <Boton type="button" variante="secundario" onClick={() => { setError(""); setPaso((p) => Math.max(0, p - 1)); }} disabled={paso === 0 || enviando}>
+          <Boton type="button" variante="secundario" onClick={() => irA(Math.max(0, paso - 1))} disabled={paso === 0 || enviando}>
             <ChevronLeft className="size-4" /> Atrás
           </Boton>
-          {paso < PASOS.length - 1 ? (
+          {desdeFirma && paso < PASOS.length - 1 ? (
+            <Boton type="button" onClick={volverAFirma} className="px-5">
+              Volver a la firma <ChevronRight className="size-4" />
+            </Boton>
+          ) : paso < PASOS.length - 1 ? (
             <Boton type="button" onClick={siguiente} className="px-6">
               Siguiente <ChevronRight className="size-4" />
             </Boton>
@@ -369,6 +410,47 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
           )}
         </div>
       </Tarjeta>
+    </div>
+  );
+}
+
+function BloqueRevision({ titulo, onCambiar, children, sinLista }: { titulo: string; onCambiar: () => void; children: React.ReactNode; sinLista?: boolean }) {
+  return (
+    <section className="rounded-xl border border-slate-200 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{titulo}</h3>
+        <button type="button" onClick={onCambiar} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100" aria-label={`Cambiar: ${titulo}`}>
+          <Pencil className="size-4" aria-hidden /> Cambiar
+        </button>
+      </div>
+      {sinLista ? children : <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5 text-sm">{children}</dl>}
+    </section>
+  );
+}
+
+function Fila({ t, children }: { t: string; children: React.ReactNode }) {
+  return (
+    <>
+      <dt className="text-slate-500">{t}</dt>
+      <dd>{children}</dd>
+    </>
+  );
+}
+
+/** Vista previa de las fotos ya hechas (en la revisión). */
+function Miniaturas({ fotos }: { fotos: File[] }) {
+  const [urls, setUrls] = useState<string[]>([]);
+  useEffect(() => {
+    const u = fotos.map((f) => URL.createObjectURL(f));
+    setUrls(u);
+    return () => u.forEach((x) => URL.revokeObjectURL(x));
+  }, [fotos]);
+  return (
+    <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+      {urls.map((u, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={u} src={u} alt={`Foto ${i + 1}`} className="aspect-square w-full rounded-lg object-cover" />
+      ))}
     </div>
   );
 }

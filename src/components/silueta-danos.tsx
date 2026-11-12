@@ -104,7 +104,7 @@ export function SiluetaDanos({ value, onChange }: { value: Dano[]; onChange: (d:
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5 overflow-x-auto pb-1" role="tablist">
+      <div className="grid grid-cols-5 gap-1.5" role="tablist" aria-label="Vista del vehículo">
         {VISTAS.map((v) => {
           const n = value.filter((d) => vistaDe(d) === v.clave).length;
           return (
@@ -118,12 +118,16 @@ export function SiluetaDanos({ value, onChange }: { value: Dano[]; onChange: (d:
                 setPendiente(null);
               }}
               className={cx(
-                "shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 min-h-10 text-sm font-medium border",
+                "relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 text-xs font-medium sm:min-h-10 sm:flex-row sm:gap-1.5 sm:rounded-full sm:text-sm",
                 vista === v.clave ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-300 text-slate-700",
               )}
             >
-              <MiniVista def={v} /> {v.corto}
-              {n > 0 && <span className={cx("rounded-full px-1.5 text-xs font-bold", vista === v.clave ? "bg-white/25" : "bg-red-100 text-red-700")}>{n}</span>}
+              <MiniVista def={v} /> <span className="max-w-full truncate">{v.corto}</span>
+              {n > 0 && (
+                <span className={cx("absolute -right-1 -top-1.5 rounded-full px-1.5 text-[11px] font-bold sm:static", vista === v.clave ? "bg-red-500 text-white sm:bg-white/25" : "bg-red-100 text-red-700")}>
+                  {n}
+                </span>
+              )}
             </button>
           );
         })}
@@ -204,11 +208,11 @@ function MiniVista({ def }: { def: DefVista }) {
 }
 
 /** Solo lectura: muestra las vistas con daños (o la superior si no hay ninguno). */
-export function VistasDanos({ danos, todas = false }: { danos: Dano[]; todas?: boolean }) {
+export function VistasDanos({ danos, todas = false, conLista = false }: { danos: Dano[]; todas?: boolean; conLista?: boolean }) {
   const numerados = conNumero(danos);
   const vistas = VISTAS.filter((v) => todas || danos.some((d) => vistaDe(d) === v.clave));
   const mostrar = vistas.length ? vistas : [VISTAS[0]];
-  return (
+  const dibujo = (
     <div className="grid grid-cols-2 gap-2 items-start">
       {mostrar.map((v) => (
         <div key={v.clave} className={cx("rounded-xl border border-slate-200 bg-white p-1.5", v.clave !== "superior" && mostrar.length > 1 && "col-span-2", mostrar.length === 1 && "col-span-2")}>
@@ -218,6 +222,23 @@ export function VistasDanos({ danos, todas = false }: { danos: Dano[]; todas?: b
           </div>
         </div>
       ))}
+    </div>
+  );
+  if (!conLista) return dibujo;
+  return (
+    <div className="space-y-3">
+      {dibujo}
+      <ol className="space-y-1.5">
+        {numerados.map(({ d, n }) => (
+          <li key={n} className="flex gap-2 text-sm">
+            <span className="grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{ background: colorDano(d.tipo) }}>{n}</span>
+            <span className="min-w-0">
+              <span className="font-medium">{d.tipo}</span> <span className="text-xs text-slate-500">· {zonaDano(d)}</span>
+              {d.nota && <span className="block text-xs text-slate-600">{d.nota}</span>}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

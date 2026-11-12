@@ -15,7 +15,7 @@ import { EditarCliente } from "./editar";
 export const dynamic = "force-dynamic";
 
 export default async function FichaCliente({ params }: { params: Promise<{ id: string }> }) {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("clientes");
   const { id } = await params;
   const data = await getCliente(s.tid, id);
   if (!data) notFound();

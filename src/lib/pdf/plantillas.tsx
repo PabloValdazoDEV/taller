@@ -27,7 +27,13 @@ const st = StyleSheet.create({
   foto: { width: 92, height: 69, objectFit: "cover", borderRadius: 2 },
 });
 
-export type TallerPdf = { nombre: string; razonSocial: string | null; nif: string | null; direccion: string | null; telefono: string | null; email: string | null };
+export type TallerPdf = {
+  nombre: string; razonSocial: string | null; nif: string | null; direccion: string | null; telefono: string | null; email: string | null;
+  /** data URL PNG/JPEG */
+  logo?: string | null;
+  /** data URL PNG/JPEG del sello o firma del taller */
+  sello?: string | null;
+};
 export type Evidencia = { firmante: string; fecha: Date; ip: string; dispositivo: string; atendidoPor: string; documentoId: string };
 
 function Marco({ taller, titulo, subtitulo, evidencia, children }: { taller: TallerPdf; titulo: string; subtitulo: string; evidencia: Evidencia; children: ReactNode }) {
@@ -35,11 +41,14 @@ function Marco({ taller, titulo, subtitulo, evidencia, children }: { taller: Tal
     <Document title={`${titulo} ${subtitulo}`} author={taller.nombre} producer="Gestión de Taller">
       <Page size="A4" style={st.pagina}>
         <View style={st.cabecera} fixed>
-          <View>
+          <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
+            {taller.logo && <Image src={taller.logo} style={{ width: 64, height: 44, objectFit: "contain" }} />}
+            <View>
             <Text style={st.tallerNombre}>{taller.nombre}</Text>
             <Text style={st.suave}>{[taller.razonSocial, taller.nif].filter(Boolean).join(" · ")}</Text>
             <Text style={st.suave}>{taller.direccion}</Text>
             <Text style={st.suave}>{[taller.telefono, taller.email].filter(Boolean).join(" · ")}</Text>
+            </View>
           </View>
           <View>
             <Text style={st.titulo}>{titulo}</Text>
@@ -131,7 +140,7 @@ function SiluetaPdf({ danos }: { danos: Dano[] }) {
   );
 }
 
-function Firmas({ firmaPng, firmante, empleado, etiquetaCliente = "Firma del cliente" }: { firmaPng: string; firmante: string; empleado: string; etiquetaCliente?: string }) {
+function Firmas({ firmaPng, firmante, empleado, sello, etiquetaCliente = "Firma del cliente" }: { firmaPng: string; firmante: string; empleado: string; sello?: string | null; etiquetaCliente?: string }) {
   return (
     <View style={st.firmas} wrap={false}>
       <View style={st.firmaCaja}>
@@ -141,8 +150,8 @@ function Firmas({ firmaPng, firmante, empleado, etiquetaCliente = "Firma del cli
       </View>
       <View style={st.firmaCaja}>
         <Text style={st.suave}>Por el taller</Text>
-        <View style={{ height: 62 }} />
-        <Text>{empleado}</Text>
+        {sello ? <Image src={sello} style={{ height: 62, objectFit: "contain" }} /> : <View style={{ height: 62 }} />}
+        <Text>Atendido por {empleado}</Text>
       </View>
     </View>
   );
@@ -246,7 +255,7 @@ export function ResguardoPdf(d: DatosResguardo) {
         </Seccion>
       )}
       <Text style={st.legal}>{d.textoLegal}</Text>
-      <Firmas firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} />
+      <Firmas sello={d.taller.sello} firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} />
     </Marco>
   );
 }
@@ -321,7 +330,7 @@ export function EntregaPdf(d: DatosEntrega) {
       )}
       <Seccion titulo="Garantía"><Text>{d.garantia}</Text></Seccion>
       <Text style={st.legal}>{d.textoLegal}</Text>
-      <Firmas firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} etiquetaCliente="Recibí conforme (cliente)" />
+      <Firmas sello={d.taller.sello} firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} etiquetaCliente="Recibí conforme (cliente)" />
     </Marco>
   );
 }
@@ -388,7 +397,7 @@ export function PrestamoPdf(d: DatosPrestamo) {
         </Seccion>
       )}
       <Text style={st.legal}>{d.textoLegal}</Text>
-      <Firmas firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} etiquetaCliente={devol ? "Firma del conductor (devolución)" : "Firma del conductor"} />
+      <Firmas sello={d.taller.sello} firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} etiquetaCliente={devol ? "Firma del conductor (devolución)" : "Firma del conductor"} />
     </Marco>
   );
 }

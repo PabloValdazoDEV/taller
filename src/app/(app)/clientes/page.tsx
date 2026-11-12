@@ -19,7 +19,7 @@ const FILTROS: { v: FiltroTipoCliente; t: string }[] = [
 
 
 export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; tipo?: string }> }) {
-  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const s = await requireSesion("clientes");
   const sp = await searchParams;
   const tipo = (FILTROS.some((f) => f.v === sp.tipo) ? sp.tipo : "todos") as FiltroTipoCliente;
   const clientes = await listarClientes(s.tid, sp.q ?? "", tipo);
@@ -29,12 +29,13 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
       <h1 className="text-2xl font-bold">Clientes</h1>
       <div className="flex flex-wrap gap-3 items-center">
         <BuscadorClientes />
-        <div className="flex gap-1.5 overflow-x-auto">
+        <div className="flex flex-wrap gap-1.5">
           {FILTROS.map((f) => (
             <Link
               key={f.v}
               href={`/clientes?${new URLSearchParams({ ...(sp.q ? { q: sp.q } : {}), ...(f.v !== "todos" ? { tipo: f.v } : {}) })}`}
-              className={cx("shrink-0 rounded-full px-3.5 py-2 text-sm font-medium border", tipo === f.v ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200 text-slate-700")}
+              aria-current={tipo === f.v ? "page" : undefined}
+              className={cx("inline-flex min-h-10 items-center rounded-full border px-3.5 text-sm font-medium", tipo === f.v ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200 text-slate-700")}
             >
               {f.t}
             </Link>

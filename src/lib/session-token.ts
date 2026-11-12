@@ -1,8 +1,9 @@
 // Firma/verificación de la sesión (sin dependencias de Node: se usa también en middleware).
 import { SignJWT, jwtVerify } from "jose";
 
-export type Rol = "admin" | "asesor" | "jefe_taller" | "mecanico";
-export type Sesion = { uid: string; tid: string; slug: string; rol: Rol; nombre: string };
+import type { Puesto } from "./puestos";
+
+export type Sesion = { uid: string; tid: string; slug: string; puestos: Puesto[]; nombre: string };
 
 export const COOKIE_SESION = "taller_sesion";
 const DURACION_H = 12;

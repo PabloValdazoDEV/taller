@@ -24,10 +24,13 @@ Para probarlo en una tablet o un móvil de la misma red Wi-Fi, abre `http://<IP-
 
 ### Usuarios de la demo (PIN)
 
-| Usuario | Rol | PIN |
+Cada persona puede tener **varios puestos**; su pantalla de inicio junta lo de todos.
+
+| Usuario | Puestos | PIN |
 |---|---|---|
-| Pablo | Administración | 1234 |
-| Laura | Recepción | 1111 |
+| Pablo | Dirección (ve todo y configura) | 1234 |
+| Laura | Recepción + Atención al cliente | 1111 |
+| Carmen | Facturación + Atención al cliente | 7777 |
 | Javier | Jefe de taller | 2222 |
 | Rubén / Sergio | Mecánicos | 3333 / 4444 |
 | Iván (chapa) / Marta (pintura) | Mecánicos | 5555 / 6666 |
@@ -59,6 +62,6 @@ drizzle/              migraciones SQL versionadas
 
 ## Estado
 
-**Hecho (demo):** acceso con PIN y permisos por rol · recepción en 5 pasos con daños, fotos y firma → PDF · flujos configurables por tipo de orden (7 tipos) · tablero · asignación de mecánicos · vista móvil del mecánico · incidencias con fotos · coches de sustitución (préstamo y devolución firmados, comprobación de condiciones) · entrega con firma · historial y auditoría · avisos por WhatsApp con enlace.
+**Hecho (demo):** acceso con PIN · **puestos combinables** (dirección, recepción, atención al cliente, facturación, jefe de taller, mecánico) con inicio adaptado a cada uno · **buscador global** con «qué decirle al cliente» · **configuración**: empleados, coches de sustitución, datos del taller, logo y textos legales · recepción en 5 pasos con daños, fotos y firma → PDF · flujos configurables por tipo de orden (7 tipos) · tablero · asignación de mecánicos · vista móvil del mecánico · incidencias con fotos · coches de sustitución (préstamo y devolución firmados, comprobación de condiciones) · entrega con firma · historial y auditoría · avisos por WhatsApp con enlace.
 
-**Pendiente para el MVP:** presupuestos (firma en tablet y aprobación por enlace) · proforma, IVA/exento y reparto entre cliente y aseguradora · cobros · avisos por email · agenda (crear y editar citas) · importación de Excel · exportación para el programa de facturación · ZIP de fotos para la fotoperitación · configuración desde la app (usuarios, flujos, textos legales, logo) · Row Level Security en PostgreSQL · probar la imagen Docker en el VPS.
+**Pendiente para el MVP:** presupuestos (firma en tablet y aprobación por enlace) · proforma, IVA/exento y reparto entre cliente y aseguradora · cobros · avisos por email · agenda (crear y editar citas) · importación de Excel · exportación para el programa de facturación · ZIP de fotos para la fotoperitación · configuración de tipos de orden y flujos desde la app · Row Level Security en PostgreSQL · probar la imagen Docker en el VPS.
