@@ -151,9 +151,12 @@ Arquitectura de **canales desacoplados**: la app genera un evento (por ejemplo, 
 
 ## 8. Presupuestos, proforma y cobros
 
-- **Líneas**: tipo (pieza / mano de obra / pintura-material / otros), referencia, descripción, cantidad, precio unitario, descuento y % de IVA.
+- **Líneas**: tipo (mano de obra por especialidad —mecánica, chapa, pintura, lunas— / pieza / otros), referencia, descripción, cantidad, precio unitario y descuento. Viven en la OT (`lineas_ot`); el presupuesto y la proforma firmados guardan una copia inmutable.
+- **Tarifas**: precio por hora SIN IVA por especialidad, en Configuración; sale relleno y se puede cambiar en cada línea.
+- **Precios con o sin IVA**: en cada orden se elige cómo se teclean (sin IVA → se suma el IVA; IVA incluido → el total es lo tecleado y la base se calcula). Los mecánicos no ven importes (ven piezas y horas).
 - Las piezas son texto libre en el MVP (sin stock), pero en una tabla preparada para enlazarlas después a un catálogo.
 - **IVA**: por defecto el general; el cliente o el documento pueden marcarse como **exento**, con su motivo legal, que aparece en el documento.
+- **Presupuesto**: copia inmutable de las líneas (nº `<OT>-P<n>`, válido 12 días hábiles). Aceptación con firma en la tablet, por enlace en el móvil del cliente (nombre + firma) o registrada por la oficina sin firma (teléfono/aseguradora/perito, con nota). Con firma se archiva el PDF con su SHA-256. Si la orden está «pendiente de aprobación», avanza sola al aceptarse.
 - **Varios pagadores**: en los siniestros, el importe se reparte entre el **cliente (franquicia)** y la **aseguradora** (resto).
 - **Cobros**: efectivo, tarjeta (solo se registra; sin integración con el datáfono) o pendiente de la aseguradora/flota. Estado: pendiente / parcial / cobrado.
 - **Exportación** de proformas y cobros a Excel/CSV para el programa de facturación externo. Su integración por API llegará en una fase posterior, cuando se sepa qué programa es.

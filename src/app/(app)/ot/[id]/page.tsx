@@ -15,12 +15,16 @@ import { enlaceWhatsapp, fmtCombustible, fmtFecha, fmtFechaHora, fmtKm, TIPO_DOC
 import { CompartirDocumento } from "@/components/compartir-documento";
 import { enlaceDocumento } from "@/lib/enlaces";
 import { AnularOT, AsignarMecanico, EditarDatosOT, FlujoEstados, NuevaIncidencia, ResolverIncidencia, SubirFotos } from "./controles";
+import { Importes, TrabajoPrevisto, type LineaVista } from "./importes";
+import { fmtEuros, ivaDeOT, totales } from "@/lib/importes";
+import { caducado, enlacePresupuesto } from "@/lib/presupuestos";
+import { Presupuestos, type PresupuestoVista } from "./presupuestos";
 
 export const dynamic = "force-dynamic";
 
 const COLOR_INC: Record<string, string> = { abierta: "#d97706", en_curso: "#2563eb", resuelta: "#059669", descartada: "#64748b" };
 
-export default async function FichaOT({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ nueva?: string; entregada?: string }> }) {
+export default async function FichaOT({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ nueva?: string; entregada?: string; presupuesto?: string }> }) {
   const s = await requireSesion();
   const { id } = await params;
   const sp = await searchParams;
@@ -32,6 +36,28 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
   const gestiona = tiene(s.puestos, "gestionTaller");
   // Recibir/entregar y prestar coches (las mismas reglas que comprueba el servidor)
   const recibe = tiene(s.puestos, "recepcion");
+  const veImportes = tiene(s.puestos, "importes");
+  const iva = ivaDeOT(ot.ot, ot.cliente, taller);
+  const lineas: LineaVista[] = ot.lineas.map((l) => ({ id: l.id, tipo: l.tipo, especialidad: l.especialidad, referencia: l.referencia, descripcion: l.descripcion, cantidad: l.cantidad, precio: l.precio, descuento: l.descuento }));
+  const totalActual = totales(lineas, iva.modo, iva.pct, iva.preciosConIva).total;
+  const coche = [ot.vehiculo.marca, ot.vehiculo.modelo].filter(Boolean).join(" ") || "vehículo";
+  const presupuestos: PresupuestoVista[] = veImportes
+    ? await Promise.all(
+        ot.presupuestos.map(async (p) => {
+          const vigente = p.estado === "pendiente" && !caducado(p) && !ot.ot.cerradaEn;
+          const enlace = vigente ? await enlacePresupuesto(p) : null;
+          return {
+            id: p.id, numero: p.numero, tipo: p.tipo, estado: p.estado, total: p.total,
+            creadoEn: p.creadoEn.toISOString(), validezHasta: p.validezHasta, caducado: caducado(p),
+            decididoEn: p.decididoEn?.toISOString() ?? null, decididoVia: p.decididoVia, decididoNombre: p.decididoNombre, decisionNota: p.decisionNota,
+            firmado: !!p.documentoId, enlace,
+            whatsapp: enlace && ot.cliente.aceptaWhatsapp
+              ? enlaceWhatsapp(ot.cliente.telefono, `Hola ${ot.cliente.nombre.split(" ")[0]}, le enviamos desde ${taller.nombre} el presupuesto de su ${coche} (${ot.vehiculo.matricula}): ${fmtEuros(p.total)}. Puede verlo y aceptarlo aquí: ${enlace}`)
+              : null,
+          };
+        }),
+      )
+    : [];
   const cerrada = !!ot.ot.cerradaEn;
   const listo = ot.estado.marca === "listo";
   const sin = ot.ot.datosSiniestro;
@@ -77,6 +103,12 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
               <CompartirDocumento {...docProps(resguardo)} />
             </div>
           )}
+        </div>
+      )}
+      {sp.presupuesto === "aceptado" && (
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 flex items-center gap-3" role="status">
+          <CheckCircle2 className="size-6 shrink-0 text-emerald-600" />
+          <div className="font-semibold text-emerald-900">Presupuesto firmado y aceptado. El PDF está en «Documentos firmados».</div>
         </div>
       )}
       {sp.entregada && (
@@ -202,6 +234,24 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
               </div>
             )}
           </Tarjeta>
+
+          {veImportes ? (
+            <>
+            <Importes
+              otId={ot.ot.id}
+              lineas={lineas}
+              modo={iva.modo}
+              pct={iva.pct}
+              motivo={iva.motivo}
+              preciosConIva={iva.preciosConIva}
+              tarifas={taller.config.tarifas ?? {}}
+              editable={!cerrada}
+            />
+            <Presupuestos otId={ot.ot.id} presupuestos={presupuestos} hayLineas={lineas.length > 0} totalActual={totalActual} editable={!cerrada} cliente={ot.cliente.nombre} />
+            </>
+          ) : (
+            <TrabajoPrevisto lineas={lineas} />
+          )}
 
           {sin?.companiaNombre && (
             <Tarjeta className="p-4 bg-violet-50/40">

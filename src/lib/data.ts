@@ -128,7 +128,7 @@ export async function getOT(tid: string, id: string) {
   if (!ot) return null;
 
   const usuarioH = alias(t.usuarios, "uh");
-  const [estados, historialEst, asignaciones, recepcion, entrega, incidencias, archivos, documentos, prestamos] = await Promise.all([
+  const [estados, historialEst, asignaciones, recepcion, entrega, incidencias, archivos, documentos, prestamos, lineas, presupuestos] = await Promise.all([
     db.select().from(t.estadosFlujo).where(and(eq(t.estadosFlujo.tallerId, tid), eq(t.estadosFlujo.tipoOrdenId, ot.tipo.id))).orderBy(asc(t.estadosFlujo.orden)),
     db
       .select({ id: t.historialEstados.id, fecha: t.historialEstados.fecha, comentario: t.historialEstados.comentario, estado: t.estadosFlujo.nombre, usuario: usuarioH.nombre })
@@ -159,6 +159,8 @@ export async function getOT(tid: string, id: string) {
       .innerJoin(t.cochesSustitucion, eq(t.cochesSustitucion.id, t.prestamos.cocheId))
       .where(and(eq(t.prestamos.tallerId, tid), eq(t.prestamos.otId, id)))
       .orderBy(desc(t.prestamos.salidaEn)),
+    db.select().from(t.lineasOt).where(and(eq(t.lineasOt.tallerId, tid), eq(t.lineasOt.otId, id))).orderBy(asc(t.lineasOt.orden), asc(t.lineasOt.creadoEn)),
+    db.select().from(t.presupuestos).where(and(eq(t.presupuestos.tallerId, tid), eq(t.presupuestos.otId, id))).orderBy(desc(t.presupuestos.version)),
   ]);
 
   const historial = [
@@ -168,7 +170,7 @@ export async function getOT(tid: string, id: string) {
       return { id: a.id, fecha: a.fecha, usuario: a.usuario, comentario: null, estado: nombre ? `Asignado a ${nombre}` : "Sin mecánico asignado", tipo: "mecanico" as const };
     }),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
-  return { ...ot, estados, historial, recepcion, entrega, incidencias, archivos, documentos, prestamos };
+  return { ...ot, estados, historial, recepcion, entrega, incidencias, archivos, documentos, prestamos, lineas, presupuestos };
 }
 export type OTDetalle = NonNullable<Awaited<ReturnType<typeof getOT>>>;
 

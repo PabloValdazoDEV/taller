@@ -4,10 +4,12 @@ import { useRef, useState, useTransition } from "react";
 import { Check, ImageUp, Loader2 } from "lucide-react";
 import { Boton, Campo, Input, Tarjeta, Textarea, cx } from "@/components/ui";
 import { guardarTaller } from "../actions";
+import { ESPECIALIDADES, NOMBRE_ESPECIALIDAD, type Especialidad } from "@/lib/importes";
 
 type Datos = {
   nombre: string; razonSocial: string; nif: string; direccion: string; telefono: string; whatsapp: string; email: string; horario: string;
-  prestamoEdadMinima: number; prestamoAniosCarnet: number; textoResguardo: string; textoEntrega: string; garantiaTexto: string; textoPrestamo: string;
+  prestamoEdadMinima: number; prestamoAniosCarnet: number; textoResguardo: string; textoEntrega: string; garantiaTexto: string; textoPrestamo: string; textoPresupuesto: string;
+  ivaDefecto: string; tarifas: Record<Especialidad, string>;
 };
 
 function Seccion({ titulo, descripcion, children }: { titulo: string; descripcion?: string; children: React.ReactNode }) {
@@ -55,6 +57,20 @@ export function FormTaller({ t, logo, sello }: { t: Datos; logo: string | null; 
         <Campo etiqueta="Dirección" className="sm:col-span-2"><Input name="direccion" defaultValue={t.direccion} autoComplete="street-address" /></Campo>
       </Seccion>
 
+      <Seccion
+        titulo="Tarifas e IVA"
+        descripcion="Precio por hora de mano de obra, SIN IVA. Sale relleno al añadir mano de obra a una orden y se puede cambiar en cada línea. Si cobráis lo mismo en todo, pon el mismo precio."
+      >
+        {ESPECIALIDADES.map((e) => (
+          <Campo key={e} etiqueta={`${NOMBRE_ESPECIALIDAD[e]} (€/hora)`}>
+            <Input name={`tarifa_${e}`} inputMode="decimal" defaultValue={t.tarifas[e]} placeholder="Ej.: 45" />
+          </Campo>
+        ))}
+        <Campo etiqueta="IVA general (%)" ayuda="El de los trabajos con IVA. Los exentos se marcan en el cliente o en cada orden.">
+          <Input name="ivaDefecto" inputMode="decimal" defaultValue={t.ivaDefecto} required className="max-w-32" />
+        </Campo>
+      </Seccion>
+
       <Seccion titulo="Contacto y horario" descripcion="Se usan en los mensajes al cliente («su coche ya está listo…»).">
         <Campo etiqueta="Teléfono"><Input name="telefono" type="tel" defaultValue={t.telefono} /></Campo>
         <Campo etiqueta="WhatsApp"><Input name="whatsapp" type="tel" defaultValue={t.whatsapp} /></Campo>
@@ -71,6 +87,7 @@ export function FormTaller({ t, logo, sello }: { t: Datos; logo: string | null; 
 
       <Seccion titulo="Textos legales" descripcion="Se imprimen en los documentos firmados. Revísalos con vuestra gestoría. Si dejas uno vacío, se usa el texto por defecto.">
         <Campo etiqueta="Resguardo de depósito (recepción)" className="sm:col-span-2"><Textarea name="textoResguardo" rows={5} defaultValue={t.textoResguardo} /></Campo>
+        <Campo etiqueta="Presupuesto" className="sm:col-span-2"><Textarea name="textoPresupuesto" rows={4} defaultValue={t.textoPresupuesto} /></Campo>
         <Campo etiqueta="Acta de entrega" className="sm:col-span-2"><Textarea name="textoEntrega" rows={3} defaultValue={t.textoEntrega} /></Campo>
         <Campo etiqueta="Garantía" className="sm:col-span-2"><Textarea name="garantiaTexto" rows={2} defaultValue={t.garantiaTexto} /></Campo>
         <Campo etiqueta="Préstamo de coche de sustitución" className="sm:col-span-2"><Textarea name="textoPrestamo" rows={4} defaultValue={t.textoPrestamo} /></Campo>

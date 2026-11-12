@@ -28,8 +28,11 @@ export async function tallerParaPdf(tl: typeof t.talleres.$inferSelect): Promise
   return { nombre: tl.nombre, razonSocial: tl.razonSocial, nif: tl.nif, direccion: tl.direccion, telefono: tl.telefono, email: tl.email, logo, sello };
 }
 
-/** Prepara las evidencias de la firma (antes de generar el PDF, que las incluye). */
-export async function prepararEvidencia(s: Sesion, firmante: string): Promise<Evidencia> {
+/**
+ * Prepara las evidencias de la firma (antes de generar el PDF, que las incluye).
+ * `s.nombre` es quien atiende (el empleado con sesión, o quien emitió el documento si firma el cliente por enlace).
+ */
+export async function prepararEvidencia(s: Pick<Sesion, "nombre">, firmante: string): Promise<Evidencia> {
   const { ip, userAgent } = await infoCliente();
   return { firmante, fecha: new Date(), ip, dispositivo: userAgent, atendidoPor: s.nombre, documentoId: randomUUID() };
 }
@@ -40,7 +43,8 @@ export async function prepararEvidencia(s: Sesion, firmante: string): Promise<Ev
  */
 export async function guardarDocumento(
   tx: Tx,
-  s: Sesion,
+  /** Taller y empleado (null si firma el cliente desde su móvil, sin sesión) */
+  s: { tid: string; uid: string | null },
   ev: Evidencia,
   tipo: (typeof t.tipoDocumentoEnum.enumValues)[number],
   otId: string | null,

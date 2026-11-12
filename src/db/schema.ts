@@ -72,6 +72,7 @@ export type TallerConfig = {
   textoResguardo?: string;
   textoEntrega?: string;
   textoPrestamo?: string;
+  textoPresupuesto?: string;
   garantiaTexto?: string;
   prestamoEdadMinima?: number;
   prestamoAniosCarnet?: number;
@@ -79,6 +80,8 @@ export type TallerConfig = {
   horario?: string;
   /** Taller de demostración (el seed solo puede borrar talleres marcados así) */
   demo?: boolean;
+  /** Precio por hora de mano de obra, SIN IVA, por especialidad (ver src/lib/importes.ts) */
+  tarifas?: Partial<Record<"mecanica" | "chapa" | "pintura" | "lunas", number>>;
 };
 
 export const usuarios = pgTable(
@@ -211,6 +214,14 @@ export const ordenesTrabajo = pgTable(
     motivoAnulacion: text("motivo_anulacion"),
     /** Último aviso al cliente de que el coche está listo (evita avisar dos veces) */
     avisadoListoEn: ts("avisado_listo_en"),
+    /** IVA del trabajo: null = según el cliente (exento si el cliente lo está) */
+    ivaModo: text("iva_modo").$type<"con_iva" | "exento">(),
+    /** % de IVA; null = el general del taller */
+    ivaPct: numeric("iva_pct", { precision: 5, scale: 2 }),
+    /** Motivo legal de la exención (sale en presupuesto y proforma); null = el del cliente */
+    motivoExencion: text("motivo_exencion"),
+    /** Cómo se teclean los precios de las líneas: false = sin IVA (base), true = IVA incluido */
+    preciosConIva: boolean("precios_con_iva").notNull().default(false),
     creadaEn: ts("creada_en").notNull().defaultNow(),
     actualizadaEn: ts("actualizada_en").notNull().defaultNow(),
   },
@@ -218,6 +229,94 @@ export const ordenesTrabajo = pgTable(
     uniqueIndex("ot_taller_numero_uq").on(t.tallerId, t.numero),
     index("ot_taller_estado_idx").on(t.tallerId, t.estadoId),
   ],
+);
+
+/**
+ * Líneas de importe de la orden (lo que se va a cobrar): mano de obra, piezas y otros conceptos.
+ * Son las líneas «vivas»; el presupuesto y la proforma firmados guardarán una copia inmutable.
+ * El precio está en el modo de la orden (preciosConIva): base sin IVA, o con IVA incluido.
+ */
+export const lineasOt = pgTable(
+  "lineas_ot",
+  {
+    id: id(),
+    tallerId: tallerId(),
+    otId: uuid("ot_id")
+      .notNull()
+      .references(() => ordenesTrabajo.id),
+    orden: integer("orden").notNull().default(0),
+    tipo: text("tipo").$type<"mano_obra" | "pieza" | "otro">().notNull(),
+    /** Solo mano de obra: mecanica | chapa | pintura | lunas */
+    especialidad: text("especialidad"),
+    referencia: text("referencia"),
+    descripcion: text("descripcion").notNull(),
+    /** Horas (mano de obra) o unidades */
+    cantidad: numeric("cantidad", { precision: 10, scale: 2 }).notNull(),
+    precio: numeric("precio", { precision: 12, scale: 4 }).notNull(),
+    /** Descuento en % (0-100) */
+    descuento: numeric("descuento", { precision: 5, scale: 2 }).notNull().default("0"),
+    creadoPor: uuid("creado_por").references(() => usuarios.id),
+    creadoEn: ts("creado_en").notNull().defaultNow(),
+    actualizadoEn: ts("actualizado_en").notNull().defaultNow(),
+  },
+  (t) => [index("lineas_ot_idx").on(t.tallerId, t.otId)],
+);
+
+/** Copia de una línea de importe tal y como se presupuestó (no cambia aunque luego se editen las líneas de la orden). */
+export type LineaPresupuesto = {
+  tipo: "mano_obra" | "pieza" | "otro";
+  especialidad: string | null;
+  referencia: string | null;
+  descripcion: string;
+  cantidad: string;
+  precio: string;
+  descuento: string;
+  /** Importe de la línea en céntimos */
+  importe: number;
+};
+
+/**
+ * Presupuestos: copia inmutable de las líneas de la orden en un momento dado, con su IVA y totales (en céntimos).
+ * El cliente lo acepta firmando en la tablet o por enlace (queda un PDF firmado), o la oficina registra
+ * una aprobación sin firma (teléfono, aseguradora, perito) con nota. Uno nuevo sustituye al pendiente anterior.
+ */
+export const presupuestos = pgTable(
+  "presupuestos",
+  {
+    id: id(),
+    tallerId: tallerId(),
+    otId: uuid("ot_id")
+      .notNull()
+      .references(() => ordenesTrabajo.id),
+    numero: text("numero").notNull(),
+    version: integer("version").notNull(),
+    tipo: text("tipo").$type<"inicial" | "complementario">().notNull(),
+    estado: text("estado").$type<"pendiente" | "aprobado" | "rechazado" | "sustituido">().notNull().default("pendiente"),
+    lineas: jsonb("lineas").$type<LineaPresupuesto[]>().notNull(),
+    ivaModo: text("iva_modo").$type<"con_iva" | "exento">().notNull(),
+    ivaPct: numeric("iva_pct", { precision: 5, scale: 2 }).notNull(),
+    motivoExencion: text("motivo_exencion"),
+    preciosConIva: boolean("precios_con_iva").notNull(),
+    base: integer("base").notNull(),
+    iva: integer("iva").notNull(),
+    total: integer("total").notNull(),
+    validezHasta: date("validez_hasta").notNull(),
+    creadoPor: uuid("creado_por").references(() => usuarios.id),
+    creadoEn: ts("creado_en").notNull().defaultNow(),
+    /** Aceptación o rechazo */
+    decididoEn: ts("decidido_en"),
+    decididoVia: text("decidido_via").$type<"tablet" | "enlace" | "manual">(),
+    /** Quién firmó/decidió por parte del cliente (o de la aseguradora) */
+    decididoNombre: text("decidido_nombre"),
+    /** Empleado que lo registró (tablet o sin firma); null si fue por enlace */
+    decididoPor: uuid("decidido_por").references(() => usuarios.id),
+    decisionNota: text("decision_nota"),
+    decisionIp: text("decision_ip"),
+    decisionDispositivo: text("decision_dispositivo"),
+    /** PDF firmado de la aceptación */
+    documentoId: uuid("documento_id").references(() => documentos.id),
+  },
+  (t) => [uniqueIndex("presupuestos_numero_uq").on(t.tallerId, t.numero), index("presupuestos_ot_idx").on(t.tallerId, t.otId)],
 );
 
 export const historialEstados = pgTable("historial_estados", {

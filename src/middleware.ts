@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_SESION, verificarSesion } from "@/lib/session-token";
 import { slugDesdeHost } from "@/lib/tenant";
 
-const PUBLICAS = ["/login", "/d", "/api/logo"]; // /d/<token>: descarga de documentos con enlace firmado · logo del taller
+const PUBLICAS = ["/login", "/d", "/p", "/api/logo"]; // /d/<token>: documentos firmados · /p/<token>: presupuesto para el cliente · logo
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

@@ -8,17 +8,49 @@ import { eq, inArray } from "drizzle-orm";
 import { db, t } from "../src/db";
 import { FLUJOS_BASE, TEXTOS_LEGALES_BASE } from "../src/lib/flujos-base";
 import type { Puesto } from "../src/lib/puestos";
+import { importeLinea, totales } from "../src/lib/importes";
 
 const SLUG = process.env.DEFAULT_TALLER_SLUG ?? "valrodri";
 
 async function borrarTaller(tallerId: string) {
   const tablas = [
-    t.auditoria, t.catalogoVehiculos, t.citas, t.prestamos, t.cochesSustitucion, t.documentos, t.archivos, t.incidencias,
-    t.entregas, t.recepciones, t.historialEstados, t.ordenesTrabajo, t.estadosFlujo, t.tiposOrden,
+    t.auditoria, t.catalogoVehiculos, t.citas, t.presupuestos, t.prestamos, t.cochesSustitucion, t.documentos, t.archivos, t.incidencias,
+    t.entregas, t.recepciones, t.historialEstados, t.lineasOt, t.ordenesTrabajo, t.estadosFlujo, t.tiposOrden,
     t.vehiculos, t.clientes, t.usuarios, t.contadores,
   ] as const;
   for (const tabla of tablas) await db.delete(tabla).where(eq(tabla.tallerId, tallerId));
   await db.delete(t.talleres).where(eq(t.talleres.id, tallerId));
+}
+
+/** Líneas de importe de ejemplo por tipo de orden: [tipo, especialidad, descripción, cantidad, precio sin IVA] */
+const LINEAS_DEMO: Record<string, [ "mano_obra" | "pieza" | "otro", string | null, string, number, number][]> = {
+  mantenimiento: [
+    ["mano_obra", "mecanica", "Mano de obra mecánica", 3.5, 45],
+    ["pieza", null, "Kit de distribución con bomba de agua", 1, 289.9],
+    ["pieza", null, "Aceite 5W30 (litros)", 5, 9.5],
+    ["pieza", null, "Filtro de aceite", 1, 12.4],
+    ["pieza", null, "Filtro de aire", 1, 18.75],
+    ["otro", null, "Gestión de residuos", 1, 4.5],
+  ],
+  neumaticos: [
+    ["pieza", null, "Neumático 205/55 R16 91V", 4, 78],
+    ["mano_obra", "mecanica", "Montaje, equilibrado y alineado", 1, 45],
+    ["otro", null, "Ecotasa neumáticos", 4, 1.5],
+  ],
+  averia: [
+    ["mano_obra", "mecanica", "Diagnosis y sustitución de pastillas", 1.5, 45],
+    ["pieza", null, "Pastillas de freno delanteras", 1, 54.3],
+  ],
+};
+
+/** Lunes a viernes (como en src/lib/presupuestos.ts, que no se puede importar aquí por ser server-only). */
+function sumarDiasHabiles(dia: string, n: number) {
+  const d = new Date(`${dia}T12:00:00Z`);
+  while (n > 0) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) n--;
+  }
+  return d.toISOString().slice(0, 10);
 }
 
 const diasDesdeHoy = (n: number, h = 9) => {
@@ -60,7 +92,8 @@ async function main() {
       whatsapp: "680 77 29 49",
       email: "talleresvalrodri@hotmail.com",
       colorPrimario: "#c2410c",
-      config: { ...TEXTOS_LEGALES_BASE, demo: true, horario: "L-V 8:30-14:00 y 15:00-18:00" },
+      // Tarifas de ejemplo (€/h sin IVA): el taller pone las suyas en Configuración
+      config: { ...TEXTOS_LEGALES_BASE, demo: true, horario: "L-V 8:30-14:00 y 15:00-18:00", tarifas: { mecanica: 45, chapa: 42, pintura: 42, lunas: 40 } },
     })
     .returning();
   const tid = taller.id;
@@ -234,6 +267,23 @@ async function main() {
       objetos: ["Llaves (2)", "Documentación"],
       danos: o.danos ?? [],
     });
+    // Importes de ejemplo (precios sin IVA)
+    const lineasDemo = LINEAS_DEMO[o.tipo];
+    if (lineasDemo)
+      await db.insert(t.lineasOt).values(
+        lineasDemo.map(([tipo, especialidad, descripcion, cantidad, precio], i) => ({
+          tallerId: tid, otId: ot.id, orden: i + 1, tipo, especialidad, descripcion, cantidad: String(cantidad), precio: String(precio), creadoPor: U["Laura"].id,
+        })),
+      );
+    // La avería espera la aprobación del cliente: lleva un presupuesto pendiente (para la demo del enlace)
+    if (lineasDemo && o.recorrido.at(-1) === "Pendiente de aprobación") {
+      const ls = lineasDemo.map(([tipo, especialidad, descripcion, cantidad, precio]) => ({ tipo, especialidad, referencia: null, descripcion, cantidad: cantidad.toFixed(2), precio: precio.toFixed(4), descuento: "0.00", importe: importeLinea({ cantidad, precio }) }));
+      const tot = totales(ls, "con_iva", "21", false);
+      await db.insert(t.presupuestos).values({
+        tallerId: tid, otId: ot.id, numero: `${ot.numero}-P1`, version: 1, tipo: "inicial", lineas: ls, ivaModo: "con_iva", ivaPct: "21.00", preciosConIva: false,
+        base: tot.base, iva: tot.iva, total: tot.total, validezHasta: sumarDiasHabiles(iso(new Date()), 12), creadoPor: U["Laura"].id,
+      });
+    }
     if (o.recorrido.includes("Esperando piezas")) {
       await db.insert(t.incidencias).values({
         tallerId: tid, otId: ot.id, tipo: "retraso_piezas", afectaPlazo: true,

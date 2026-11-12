@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet, Svg, Path, Rect, Circle, G } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
-import type { Dano, DatosSiniestro } from "@/db/schema";
+import type { Dano, DatosSiniestro, LineaPresupuesto } from "@/db/schema";
 import { ESTILOS, VISTAS, vistaDe, zonaDano, type DefVista, type Forma } from "@/lib/silueta";
 import { fmtCombustible, fmtFecha, fmtFechaHora, fmtKm, fmtMiles } from "@/lib/formato";
 
@@ -36,7 +36,7 @@ export type TallerPdf = {
 };
 export type Evidencia = { firmante: string; fecha: Date; ip: string; dispositivo: string; atendidoPor: string; documentoId: string };
 
-function Marco({ taller, titulo, subtitulo, evidencia, children }: { taller: TallerPdf; titulo: string; subtitulo: string; evidencia: Evidencia; children: ReactNode }) {
+function Marco({ taller, titulo, subtitulo, evidencia, pie, children }: { taller: TallerPdf; titulo: string; subtitulo: string; evidencia?: Evidencia; pie?: string; children: ReactNode }) {
   return (
     <Document title={`${titulo} ${subtitulo}`} author={taller.nombre} producer="Gestión de Taller">
       <Page size="A4" style={st.pagina}>
@@ -53,13 +53,15 @@ function Marco({ taller, titulo, subtitulo, evidencia, children }: { taller: Tal
           <View>
             <Text style={st.titulo}>{titulo}</Text>
             <Text style={{ textAlign: "right" }}>{subtitulo}</Text>
-            <Text style={[st.suave, { textAlign: "right" }]}>{fmtFechaHora(evidencia.fecha)}</Text>
+            {evidencia && <Text style={[st.suave, { textAlign: "right" }]}>{fmtFechaHora(evidencia.fecha)}</Text>}
           </View>
         </View>
         {children}
         <Text style={st.pie} fixed render={({ pageNumber, totalPages }) =>
-          `Firmado electrónicamente por ${evidencia.firmante} el ${fmtFechaHora(evidencia.fecha)} · IP ${evidencia.ip} · Atendido por ${evidencia.atendidoPor} · Doc. ${evidencia.documentoId} · ` +
-          `Dispositivo: ${evidencia.dispositivo.slice(0, 90)} · Pág. ${pageNumber}/${totalPages}`
+          evidencia
+            ? `Firmado electrónicamente por ${evidencia.firmante} el ${fmtFechaHora(evidencia.fecha)} · IP ${evidencia.ip} · Atendido por ${evidencia.atendidoPor} · Doc. ${evidencia.documentoId} · ` +
+              `Dispositivo: ${evidencia.dispositivo.slice(0, 90)} · Pág. ${pageNumber}/${totalPages}`
+            : `${pie ?? ""} · Pág. ${pageNumber}/${totalPages}`
         } />
       </Page>
     </Document>
@@ -411,6 +413,128 @@ export function PrestamoPdf(d: DatosPrestamo) {
       )}
       <Text style={st.legal}>{d.textoLegal}</Text>
       <Firmas sello={d.taller.sello} firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} etiquetaCliente={devol ? "Firma del conductor (devolución)" : "Firma del conductor"} />
+    </Marco>
+  );
+}
+
+// ───────────────────────── Presupuesto ─────────────────────────
+
+export type DatosPresupuesto = {
+  taller: TallerPdf;
+  /** Solo si el cliente lo ha firmado (tablet o enlace) */
+  evidencia?: Evidencia;
+  firmaPng?: string;
+  numero: string;
+  numeroOT: string;
+  tipo: "inicial" | "complementario";
+  creadoEn: Date;
+  validezHasta: string;
+  cliente: Cli;
+  vehiculo: Veh;
+  trabajoSolicitado: string;
+  lineas: LineaPresupuesto[];
+  modo: "con_iva" | "exento";
+  pct: string;
+  motivoExencion: string | null;
+  preciosConIva: boolean;
+  base: number;
+  iva: number;
+  total: number;
+  /** Situación si no está firmado (p. ej. «Aprobado por teléfono…» o «Rechazado») */
+  situacion?: string;
+  textoLegal: string;
+};
+
+const eur = (c: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(c / 100);
+const precioPdf = (v: string) => {
+  const n = Number(v);
+  const dec = Math.round(n * 100) / 100 === n ? 2 : 4;
+  return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: dec }).format(n);
+};
+const cant = (v: string) => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(Number(v));
+const ESP: Record<string, string> = { mecanica: "mecánica", chapa: "chapa", pintura: "pintura", lunas: "lunas" };
+
+const tb = StyleSheet.create({
+  fila: { flexDirection: "row", paddingVertical: 3, borderBottomWidth: 0.5, borderBottomColor: C.borde },
+  cab: { flexDirection: "row", paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: C.texto, fontFamily: "Helvetica-Bold", fontSize: 8 },
+  concepto: { flex: 1, paddingRight: 6 },
+  num: { width: 52, textAlign: "right" },
+  dto: { width: 34, textAlign: "right" },
+  imp: { width: 64, textAlign: "right" },
+  tot: { flexDirection: "row", justifyContent: "flex-end", paddingVertical: 1.5 },
+  totEt: { width: 150, textAlign: "right", paddingRight: 8, color: C.suave },
+  totVal: { width: 70, textAlign: "right" },
+});
+
+export function PresupuestoPdf(d: DatosPresupuesto) {
+  const firmado = !!(d.evidencia && d.firmaPng);
+  return (
+    <Marco
+      taller={d.taller}
+      titulo={d.tipo === "complementario" ? "PRESUPUESTO COMPLEMENTARIO" : "PRESUPUESTO"}
+      subtitulo={`Nº ${d.numero} · Orden ${d.numeroOT}`}
+      evidencia={d.evidencia}
+      pie={`Presupuesto ${d.numero} · Emitido el ${fmtFecha(d.creadoEn)} · Válido hasta el ${fmtFecha(d.validezHasta)}${d.situacion ? ` · ${d.situacion}` : " · Pendiente de aceptación"}`}
+    >
+      <ClienteVehiculo cliente={d.cliente} vehiculo={d.vehiculo} />
+      {d.trabajoSolicitado && (
+        <Seccion titulo="Trabajo solicitado">
+          <View style={st.caja}><Text>{d.trabajoSolicitado}</Text></View>
+        </Seccion>
+      )}
+      <View style={st.seccion}>
+        <Text style={st.seccionTitulo}>Detalle{d.modo === "con_iva" ? (d.preciosConIva ? " (precios con IVA incluido)" : " (precios sin IVA)") : ""}</Text>
+        <View style={tb.cab} fixed>
+          <Text style={tb.concepto}>Concepto</Text>
+          <Text style={tb.num}>Cantidad</Text>
+          <Text style={tb.num}>Precio</Text>
+          <Text style={tb.dto}>Dto.</Text>
+          <Text style={tb.imp}>Importe</Text>
+        </View>
+        {d.lineas.map((l, i) => (
+          <View key={i} style={tb.fila} wrap={false}>
+            <View style={tb.concepto}>
+              <Text>{l.descripcion}</Text>
+              {(l.referencia || (l.tipo === "mano_obra" && l.especialidad)) && (
+                <Text style={[st.suave, { fontSize: 7.5 }]}>
+                  {[l.tipo === "mano_obra" && l.especialidad ? `Mano de obra ${ESP[l.especialidad] ?? l.especialidad}` : null, l.referencia ? `Ref. ${l.referencia}` : null].filter(Boolean).join(" · ")}
+                </Text>
+              )}
+            </View>
+            <Text style={tb.num}>{cant(l.cantidad)}{l.tipo === "mano_obra" ? " h" : ""}</Text>
+            <Text style={tb.num}>{precioPdf(l.precio)}</Text>
+            <Text style={tb.dto}>{Number(l.descuento) > 0 ? `${cant(l.descuento)} %` : ""}</Text>
+            <Text style={tb.imp}>{eur(l.importe)}</Text>
+          </View>
+        ))}
+        <View style={{ marginTop: 6 }} wrap={false}>
+          {d.modo === "con_iva" ? (
+            <>
+              <View style={tb.tot}><Text style={tb.totEt}>Base imponible</Text><Text style={tb.totVal}>{eur(d.base)}</Text></View>
+              <View style={tb.tot}><Text style={tb.totEt}>IVA ({cant(d.pct)} %)</Text><Text style={tb.totVal}>{eur(d.iva)}</Text></View>
+              <View style={[tb.tot, { borderTopWidth: 1, borderTopColor: C.texto, marginTop: 2, paddingTop: 3 }]}>
+                <Text style={[tb.totEt, { color: C.texto, fontFamily: "Helvetica-Bold" }]}>TOTAL</Text>
+                <Text style={[tb.totVal, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>{eur(d.total)}</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={[tb.tot, { borderTopWidth: 1, borderTopColor: C.texto, paddingTop: 3 }]}>
+                <Text style={[tb.totEt, { color: C.texto, fontFamily: "Helvetica-Bold" }]}>TOTAL (exento de IVA)</Text>
+                <Text style={[tb.totVal, { fontFamily: "Helvetica-Bold", fontSize: 11 }]}>{eur(d.total)}</Text>
+              </View>
+              <Text style={[st.suave, { textAlign: "right", marginTop: 2 }]}>Operación exenta de IVA{d.motivoExencion ? `: ${d.motivoExencion}` : ""}</Text>
+            </>
+          )}
+        </View>
+      </View>
+      <Seccion titulo="Validez">
+        <Text>Este presupuesto es válido hasta el {fmtFecha(d.validezHasta)}.{d.situacion ? ` ${d.situacion}.` : ""}</Text>
+      </Seccion>
+      <Text style={st.legal}>{d.textoLegal}</Text>
+      {firmado && (
+        <Firmas sello={d.taller.sello} firmaPng={d.firmaPng!} firmante={d.evidencia!.firmante} empleado={d.evidencia!.atendidoPor} etiquetaCliente="Acepto el presupuesto (cliente)" />
+      )}
     </Marco>
   );
 }

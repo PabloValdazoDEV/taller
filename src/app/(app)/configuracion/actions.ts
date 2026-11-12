@@ -8,6 +8,7 @@ import { db, t } from "@/db";
 import { requireSesion } from "@/lib/auth";
 import { auditar } from "@/lib/auditoria";
 import { esPuesto, longitudPin, type Puesto } from "@/lib/puestos";
+import { ESPECIALIDADES, NOMBRE_ESPECIALIDAD, leerDecimal, type Especialidad } from "@/lib/importes";
 import { normalizarMatricula } from "@/lib/data";
 import { DanosZ } from "@/lib/danos";
 import type { Dano } from "@/db/schema";
@@ -234,6 +235,7 @@ const TallerZ = z.object({
   textoEntrega: z.string().nullable(),
   garantiaTexto: z.string().nullable(),
   textoPrestamo: z.string().nullable(),
+  textoPresupuesto: z.string().nullable(),
 });
 
 const TIPOS_LOGO: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
@@ -244,6 +246,18 @@ export async function guardarTaller(fd: FormData): Promise<R> {
   if (!v.success) return { error: v.error.issues[0].message };
   const d = v.data;
   const actual = await tallerPorId(s.tid);
+
+  // Tarifas de mano de obra (€/h sin IVA) e IVA general
+  const tarifas: Partial<Record<Especialidad, number>> = {};
+  for (const e of ESPECIALIDADES) {
+    const v = String(fd.get(`tarifa_${e}`) ?? "").trim();
+    if (!v) continue;
+    const n = leerDecimal(v);
+    if (!Number.isFinite(n) || n < 0 || n > 10000) return { error: `Precio por hora de ${NOMBRE_ESPECIALIDAD[e].toLowerCase()} no válido` };
+    tarifas[e] = Math.round(n * 100) / 100;
+  }
+  const ivaDefecto = leerDecimal(fd.get("ivaDefecto"));
+  if (!Number.isFinite(ivaDefecto) || ivaDefecto < 0 || ivaDefecto > 100) return { error: "IVA general no válido" };
 
   let logoRuta = actual.logoRuta;
   const logo = fd.get("logo");
@@ -278,8 +292,10 @@ export async function guardarTaller(fd: FormData): Promise<R> {
       email: d.email,
       logoRuta,
       selloRuta,
+      ivaDefecto: ivaDefecto.toFixed(2),
       config: {
         ...actual.config,
+        tarifas,
         horario: d.horario ?? undefined,
         prestamoEdadMinima: d.prestamoEdadMinima,
         prestamoAniosCarnet: d.prestamoAniosCarnet,
@@ -287,6 +303,7 @@ export async function guardarTaller(fd: FormData): Promise<R> {
         textoEntrega: d.textoEntrega ?? TEXTOS_LEGALES_BASE.textoEntrega,
         garantiaTexto: d.garantiaTexto ?? TEXTOS_LEGALES_BASE.garantiaTexto,
         textoPrestamo: d.textoPrestamo ?? TEXTOS_LEGALES_BASE.textoPrestamo,
+        textoPresupuesto: d.textoPresupuesto ?? TEXTOS_LEGALES_BASE.textoPresupuesto,
       },
     })
     .where(eq(t.talleres.id, s.tid));

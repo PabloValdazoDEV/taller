@@ -30,6 +30,8 @@ const PERMISOS = {
   forzarPrestamo: ["direccion", "jefe_taller"],
   sustitucion: ["direccion", "recepcion", "telefono", "jefe_taller"],
   configuracion: ["direccion"],
+  /** Ver y editar los importes (mano de obra, piezas, IVA) */
+  importes: ["direccion", "recepcion", "facturacion", "jefe_taller"],
   /** Anular una orden dada de alta por error */
   anularOrden: ["direccion"],
 } satisfies Record<string, Puesto[]>;

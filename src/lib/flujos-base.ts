@@ -84,6 +84,9 @@ export const TEXTOS_LEGALES_BASE = {
     "Existen hojas de reclamaciones a disposición del cliente. Sus datos se tratarán por el taller para la gestión del servicio (RGPD); puede ejercer sus derechos dirigiéndose al taller.",
   textoEntrega:
     "El cliente recibe el vehículo y declara su conformidad con los trabajos realizados y el estado del mismo. Las reparaciones están garantizadas en los términos indicados.",
+  textoPresupuesto:
+    "La aceptación de este presupuesto autoriza al taller a realizar los trabajos descritos por el importe indicado. Cualquier trabajo adicional que resulte necesario se comunicará al cliente y requerirá su aprobación previa. " +
+    "Conforme al RD 1457/1986, el cliente puede solicitar las piezas sustituidas. Sus datos se tratarán por el taller para la gestión del servicio (RGPD).",
   garantiaTexto: "Garantía de 3 meses o 2.000 km (lo que antes se cumpla) sobre los trabajos realizados, según RD 1457/1986.",
   textoPrestamo:
     "El taller cede temporalmente el vehículo de sustitución al conductor indicado, que se compromete a devolverlo en el mismo estado, con el mismo nivel de combustible, " +
