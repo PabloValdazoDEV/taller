@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Car, ClipboardPlus, House, KanbanSquare, Menu, Search, Settings, Users, Wrench, X } from "lucide-react";
+import { Car, ClipboardPlus, House, KanbanSquare, Menu, Settings, Users, Wrench, X } from "lucide-react";
 import { tiene, type Permiso, type Puesto } from "@/lib/puestos";
 import { cx } from "./ui";
 
 const ITEMS: { href: string; texto: string; corto?: string; icono: typeof House; permiso: Permiso }[] = [
   { href: "/", texto: "Inicio", icono: House, permiso: "oficina" },
-  { href: "/buscar", texto: "Buscar", icono: Search, permiso: "oficina" },
   { href: "/recepcion/nueva", texto: "Nueva recepción", corto: "Recibir", icono: ClipboardPlus, permiso: "recepcion" },
   { href: "/mis-trabajos", texto: "Mis trabajos", icono: Wrench, permiso: "misTrabajos" },
   { href: "/tablero", texto: "Tablero", icono: KanbanSquare, permiso: "tablero" },

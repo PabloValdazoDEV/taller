@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { KeyRound, Loader2, Pencil, Plus, RotateCcw, UserX } from "lucide-react";
 import { Boton, Campo, Input, Pastilla, Tarjeta, cx } from "@/components/ui";
 import { Dialogo } from "@/components/dialogo";
-import { INFO_PUESTO, PUESTOS, type Puesto } from "@/lib/puestos";
+import { INFO_PUESTO, PUESTOS, longitudPin, type Puesto } from "@/lib/puestos";
 import type { Empleado } from "@/lib/data";
 import { cambiarActivoEmpleado, guardarEmpleado } from "../actions";
 
@@ -110,6 +110,9 @@ function FormEmpleado({ e, yo, onHecho }: { e: Empleado | null; yo: boolean; onH
   const [color, setColor] = useState(e?.color ?? COLORES[6]);
   const [puestos, setPuestos] = useState<Puesto[]>(e?.puestos ?? []);
   const [cambiarPin, setCambiarPin] = useState(!e);
+  // Dirección y jefe de taller llevan PIN de 6 cifras; si al cambiar de puestos cambia la longitud, hace falta uno nuevo
+  const cifras = longitudPin(puestos);
+  const cambiaLongitud = !!e && longitudPin(e.puestos) !== cifras;
   const [error, setError] = useState("");
   const [pend, start] = useTransition();
 
@@ -175,9 +178,12 @@ function FormEmpleado({ e, yo, onHecho }: { e: Empleado | null; yo: boolean; onH
         </div>
       </fieldset>
 
-      {cambiarPin ? (
-        <Campo etiqueta={e ? "Nuevo PIN" : "PIN de acceso"} ayuda="4 cifras. Díselo en persona; no se puede volver a consultar.">
-          <Input name="pin" inputMode="numeric" pattern="\d{4}" maxLength={4} required autoComplete="new-password" placeholder="••••" className="max-w-40 tracking-[0.5em] font-mono" />
+      {cambiarPin || cambiaLongitud ? (
+        <Campo
+          etiqueta={e ? "Nuevo PIN" : "PIN de acceso"}
+          ayuda={`${cambiaLongitud ? `Con estos puestos su PIN pasa a tener ${cifras} cifras. ` : `${cifras} cifras${cifras === 6 ? " (Dirección y Jefe de taller llevan 6)" : ""}. `}Díselo en persona; no se puede volver a consultar.`}
+        >
+          <Input key={cifras} name="pin" inputMode="numeric" pattern={`\\d{${cifras}}`} minLength={cifras} maxLength={cifras} required autoComplete="new-password" placeholder={"•".repeat(cifras)} className="max-w-48 tracking-[0.5em] font-mono" />
         </Campo>
       ) : (
         <Boton type="button" variante="secundario" onClick={() => setCambiarPin(true)}>

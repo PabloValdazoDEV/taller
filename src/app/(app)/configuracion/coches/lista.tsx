@@ -8,13 +8,13 @@ import { SelectorMarcaModelo, LogoMarca } from "@/components/selector-marca-mode
 import { SelectorCombustible } from "@/components/combustible";
 import { SiluetaDanos, VistasDanos } from "@/components/silueta-danos";
 import type { Dano } from "@/db/schema";
-import { fmtCombustible, fmtFecha, fmtKm } from "@/lib/formato";
+import { diaISO, fmtCombustible, fmtFecha, fmtKm } from "@/lib/formato";
 import type { CocheConfig } from "@/lib/data";
 import { eliminarCoche, guardarCoche, reactivarCoche } from "../actions";
 
 const ESTADO = { disponible: ["Disponible", "#047857"], prestado: ["Prestado", "#b45309"], mantenimiento: ["En mantenimiento", "#475569"] } as const;
 
-const hoyMas = (dias: number) => new Date(Date.now() + dias * 86400_000).toISOString().slice(0, 10);
+const hoyMas = (dias: number) => diaISO(new Date(Date.now() + dias * 86400_000));
 
 export function ListaCoches({ coches }: { coches: CocheConfig[] }) {
   const [editando, setEditando] = useState<CocheConfig | "nuevo" | null>(null);

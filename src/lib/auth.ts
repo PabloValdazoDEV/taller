@@ -36,7 +36,8 @@ export async function requireSesion(permiso?: Permiso): Promise<Sesion> {
 export async function infoCliente() {
   const h = await headers();
   return {
-    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? "local",
+    // x-real-ip lo pone nginx y el cliente no puede falsearlo; x-forwarded-for sí (se usa el último salto)
+    ip: h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",").at(-1)?.trim() ?? "local",
     userAgent: h.get("user-agent") ?? "",
   };
 }

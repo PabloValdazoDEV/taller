@@ -25,6 +25,7 @@ export async function actualizarCliente(fd: FormData): Promise<{ error?: string 
     email: vacio(fd.get("email")),
     direccion: vacio(fd.get("direccion")),
     notas: vacio(fd.get("notas")),
+    aceptaLlamada: fd.get("aceptaLlamada") === "on",
     aceptaWhatsapp: fd.get("aceptaWhatsapp") === "on",
     aceptaEmail: fd.get("aceptaEmail") === "on",
     exentoIva: fd.get("exentoIva") === "on",

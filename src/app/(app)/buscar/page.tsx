@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { MessageCircle, Phone, ShieldCheck, UserRound, Wrench } from "lucide-react";
+import { History, MessageCircle, Phone, ShieldCheck, UserRound, Wrench } from "lucide-react";
 import { requireSesion } from "@/lib/auth";
-import { buscarGlobal } from "@/lib/data";
+import { buscarGlobal, buscarOTs } from "@/lib/data";
 import { FASE_CLIENTE, faseCliente, hoyISO, queDecirle } from "@/lib/estado-cliente";
 import { enlaceWhatsapp, fmtFecha } from "@/lib/formato";
 import { BuscadorGlobal } from "@/components/buscador-global";
@@ -13,10 +13,13 @@ export const dynamic = "force-dynamic";
 export default async function Buscar({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const s = await requireSesion("oficina");
   const q = ((await searchParams).q ?? "").trim();
-  const { ordenes, clientes } = await buscarGlobal(s.tid, q);
+  // Sin texto: histórico de las últimas entregadas; con texto: lo que coincide (incluidas las anuladas)
+  const [{ ordenes, clientes }, cerradas] = await Promise.all([
+    buscarGlobal(s.tid, q),
+    q.length === 1 ? Promise.resolve([]) : buscarOTs(s.tid, q, { cerradas: true, limite: q ? 30 : 40 }),
+  ]);
   const hoy = hoyISO();
   const abiertas = ordenes.filter((o) => !o.cerradaEn);
-  const cerradas = ordenes.filter((o) => o.cerradaEn);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -27,7 +30,7 @@ export default async function Buscar({ searchParams }: { searchParams: Promise<{
         {q.length === 1 && <p className="text-sm text-slate-500">Escribe al menos 2 caracteres.</p>}
       </div>
 
-      {q.length >= 2 && ordenes.length === 0 && clientes.length === 0 && (
+      {q.length >= 2 && abiertas.length === 0 && clientes.length === 0 && cerradas.length === 0 && (
         <Tarjeta><Vacio>No hay nada que coincida con «{q}».</Vacio></Tarjeta>
       )}
 
@@ -109,16 +112,24 @@ export default async function Buscar({ searchParams }: { searchParams: Promise<{
 
       {cerradas.length > 0 && (
         <section aria-labelledby="h-historial" className="space-y-3">
-          <h2 id="h-historial" className="font-semibold text-slate-800">Historial ({cerradas.length})</h2>
+          <h2 id="h-historial" className="inline-flex items-center gap-2 font-semibold text-slate-800">
+            <History className="size-4" aria-hidden /> {q ? `Historial (${cerradas.length})` : "Últimas entregadas"}
+          </h2>
           <Tarjeta className="divide-y divide-slate-100">
             {cerradas.map((o) => (
               <Link key={o.id} href={`/ot/${o.id}`} className="flex flex-wrap items-center gap-3 p-4 hover:bg-slate-50">
                 <Matricula>{o.matricula}</Matricula>
                 <div className="min-w-0 flex-1 text-sm">
-                  <div className="font-medium">{o.clienteNombre} · <span className="font-mono text-slate-500">{o.numero}</span></div>
-                  <div className="truncate text-slate-500">{o.trabajo}</div>
+                  <div className="flex items-center gap-1.5 font-medium">
+                    {o.marca && <LogoMarca marca={o.marca} className="size-5" />} {o.marca} {o.modelo}
+                    <span className="font-normal text-slate-500">· {o.clienteNombre}</span>
+                  </div>
+                  <div className="font-mono text-xs text-slate-500">{o.numero}</div>
                 </div>
-                <span className="text-sm text-slate-500">Entregado {fmtFecha(o.cerradaEn)}</span>
+                <Pastilla color={o.tipoColor}>{o.tipoNombre}</Pastilla>
+                <span className={o.anuladaEn ? "text-sm font-semibold text-red-700" : "text-sm text-slate-500"}>
+                  {o.anuladaEn ? "Anulada" : "Entregado"} {fmtFecha(o.cerradaEn)}
+                </span>
               </Link>
             ))}
           </Tarjeta>

@@ -1,12 +1,13 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import type { DB } from "@/db";
+import { diaISO } from "./formato";
 
 type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
 
 /** Número correlativo por taller y año: "2026-0007". Atómico (UPSERT). */
 export async function siguienteNumeroOT(tx: Tx | DB, tallerId: string) {
-  const anio = new Date().getFullYear();
+  const anio = diaISO().slice(0, 4); // año en hora de Madrid
   const clave = `ot-${anio}`;
   const res = await tx.execute<{ valor: number }>(sql`
     insert into contadores (taller_id, clave, valor) values (${tallerId}, ${clave}, 1)

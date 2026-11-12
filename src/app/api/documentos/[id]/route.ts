@@ -18,7 +18,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${encodeURIComponent(nombre)}"`,
+      "Content-Disposition": `inline; filename="${nombre.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(nombre)}`,
       "X-Documento-SHA256": d.sha256,
     },
   });

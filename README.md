@@ -28,10 +28,10 @@ Cada persona puede tener **varios puestos**; su pantalla de inicio junta lo de t
 
 | Usuario | Puestos | PIN |
 |---|---|---|
-| Pablo | Dirección (ve todo y configura) | 1234 |
+| Pablo | Dirección (ve todo y configura) | 123456 |
 | Laura | Recepción + Atención al cliente | 1111 |
 | Carmen | Facturación + Atención al cliente | 7777 |
-| Javier | Jefe de taller | 2222 |
+| Javier | Jefe de taller | 222222 |
 | Rubén / Sergio | Mecánicos | 3333 / 4444 |
 | Iván (chapa) / Marta (pintura) | Mecánicos | 5555 / 6666 |
 

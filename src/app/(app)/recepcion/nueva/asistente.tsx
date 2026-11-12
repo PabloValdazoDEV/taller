@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, Loader2, Pencil, Search } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, Mail, MessageCircle, Pencil, Phone, Search } from "lucide-react";
 import type { Dano } from "@/db/schema";
 import { Boton, Campo, Input, Matricula, Select, Tarjeta, Textarea, cx } from "@/components/ui";
 import { SiluetaDanos, VistasDanos } from "@/components/silueta-danos";
 import { SelectorMarcaModelo, LogoMarca } from "@/components/selector-marca-modelo";
 import { SelectorCombustible } from "@/components/combustible";
+import { KmInput } from "@/components/km-input";
+import { TelefonoInput } from "@/components/telefono-input";
 import { FotosInput } from "@/components/fotos-input";
 import { PanelFirma } from "@/components/firma";
-import { fmtCombustible } from "@/lib/formato";
+import { fmtCombustible, fmtFechaHora, fmtKm } from "@/lib/formato";
 import { zonaDano } from "@/lib/silueta";
+import { separarTelefono } from "@/lib/telefono";
 import { buscarPorMatricula, crearRecepcion } from "../actions";
 
 type Tipo = { id: string; nombre: string; color: string; requiereSiniestro: boolean };
@@ -19,7 +22,7 @@ type Compania = { id: string; nombre: string; tipo: string };
 export type Prefill = { buscar?: boolean; citaId?: string; matricula?: string; contacto?: string; telefono?: string; motivo?: string; tipoOrdenId?: string };
 
 const TESTIGOS = ["Motor", "ABS", "Airbag", "Batería", "Aceite", "Frenos", "Temperatura", "Presión neumáticos"];
-const OBJETOS = ["Llaves (2)", "Llave (1)", "Documentación", "Rueda de repuesto", "Gato / herramientas", "Tapacubos", "Silla infantil", "Objetos personales"];
+const OBJETOS = ["Llave (1)", "Llaves (2)", "Documentación", "Rueda de repuesto", "Gato / herramientas", "Tapacubos", "Silla infantil", "Objetos personales"];
 const PASOS = ["Vehículo y cliente", "Trabajo", "Estado del vehículo", "Fotos", "Revisión y firma"];
 
 export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[]; companias: Compania[]; prefill: Prefill }) {
@@ -43,21 +46,24 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
     clienteNif: "",
     clienteTelefono: prefill.telefono ?? "",
     clienteEmail: "",
+    aceptaLlamada: true,
     aceptaWhatsapp: true,
-    aceptaEmail: true,
+    aceptaEmail: false,
     tipoOrdenId: prefill.tipoOrdenId ?? "",
     trabajo: prefill.motivo ?? "",
+    fechaEntrada: "",
     fechaPrevista: "",
     renunciaPresupuesto: false,
     km: "",
     combustible: null as number | null,
     testigos: [] as string[],
-    objetos: ["Llaves (2)", "Documentación"] as string[],
+    objetos: ["Llave (1)"] as string[],
     danos: [] as Dano[],
     observaciones: "",
     siniestro: { companiaId: "", numeroSiniestro: "", numeroPoliza: "", perito: "", franquicia: "", cubreSustitucion: false },
     firmante: "",
   });
+  const [masDatos, setMasDatos] = useState(false);
   const [fotos, setFotos] = useState<File[]>([]);
   const [firma, setFirma] = useState<string | null>(null);
   // Si se vuelve desde la firma para corregir algo, se ofrece regresar directamente a ella.
@@ -91,17 +97,65 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
         clienteNif: c?.nif ?? "",
         clienteTelefono: c?.telefono ?? p.clienteTelefono,
         clienteEmail: c?.email ?? "",
+        aceptaLlamada: c?.aceptaLlamada ?? true,
         aceptaWhatsapp: c?.aceptaWhatsapp ?? true,
-        aceptaEmail: c?.aceptaEmail ?? true,
+        aceptaEmail: c?.aceptaEmail ?? false,
       }));
+      if (c?.nif || c?.email) setMasDatos(true);
     });
   }
 
-  // Viniendo de la ficha del cliente (?matricula=): buscar automáticamente
+  // Al entrar: recuperar borrador (si no se viene de una cita/cliente concreto), poner la hora local
+  // de la tablet como fecha de recepción y, viniendo de la ficha del cliente (?matricula=), buscar.
+  const [recuperado, setRecuperado] = useState(false);
+  const [listo, setListo] = useState(false);
   useEffect(() => {
-    if (prefill.buscar && d.matricula) buscar();
+    const b = leerBorrador();
+    const mismoOrigen = b && (b.d.citaId || "") === (prefill.citaId ?? "") && (!prefill.matricula || b.d.matricula === prefill.matricula);
+    if (b && mismoOrigen && b.d.matricula) {
+      setD((p) => ({ ...p, ...(b.d as Partial<typeof p>), fechaEntrada: b.d.fechaEntrada || ahoraLocal() }));
+      setPaso(Math.min(b.paso, 3));
+      setBusquedaHecha(b.busquedaHecha);
+      if (b.d.clienteNif || b.d.clienteEmail) setMasDatos(true);
+      setRecuperado(true);
+    } else {
+      set("fechaEntrada", ahoraLocal());
+      if (prefill.buscar && d.matricula) buscar();
+    }
+    setListo(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Guardar borrador en cada cambio (sin fotos ni firma) y avisar antes de salir con datos sin firmar
+  const hayDatos = !!d.matricula.trim();
+  useEffect(() => {
+    if (!listo) return;
+    if (hayDatos) guardarBorrador({ d, paso, busquedaHecha });
+  }, [d, paso, busquedaHecha, hayDatos, listo]);
+  useEffect(() => {
+    if (!hayDatos || enviando) return;
+    const antesDeSalir = (e: BeforeUnloadEvent) => e.preventDefault();
+    // Navegación interna (menú lateral, enlaces): pedir confirmación
+    const alPulsar = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement).closest("a");
+      if (!a || a.target === "_blank" || !a.href || a.href.startsWith(location.href.split("#")[0] + "#")) return;
+      if (!confirm("Hay una recepción a medias. ¿Salir? (se guarda un borrador sin las fotos ni la firma)")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", antesDeSalir);
+    document.addEventListener("click", alPulsar, true);
+    return () => {
+      window.removeEventListener("beforeunload", antesDeSalir);
+      document.removeEventListener("click", alPulsar, true);
+    };
+  }, [hayDatos, enviando]);
+
+  function descartarBorrador() {
+    borrarBorrador();
+    location.reload();
+  }
 
   function validar(p: number): string {
     if (p === 0) {
@@ -109,11 +163,14 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
       if (!busquedaHecha) return "Pulsa «Buscar» para comprobar si el vehículo ya existe";
       if (!d.marca) return "Elige la marca del vehículo";
       if (d.clienteNombre.trim().length < 2) return "Introduce el nombre del cliente";
-      if (!d.clienteTelefono && !d.clienteEmail) return "Introduce al menos un teléfono o un email de contacto";
+      const digitos = separarTelefono(d.clienteTelefono).numero.replace(/\D/g, "").length;
+      if (!digitos) return "Introduce el teléfono del cliente";
+      if (digitos < 6) return "El teléfono parece incompleto";
     }
     if (p === 1) {
       if (!d.tipoOrdenId) return "Elige el tipo de orden";
-      if (d.trabajo.trim().length < 3) return "Describe el trabajo solicitado";
+      if (!d.fechaEntrada) return "Indica la fecha de recepción";
+      if (new Date(d.fechaEntrada).getTime() > Date.now() + 5 * 60_000) return "La fecha de recepción no puede ser futura";
       if (tipoSel?.requiereSiniestro && !d.siniestro.companiaId) return "Indica la compañía";
     }
     if (p === 2) {
@@ -166,14 +223,19 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
       JSON.stringify({
         ...d,
         km: d.km ? Number(d.km) : null,
+        fechaEntrada: new Date(d.fechaEntrada).toISOString(),
         siniestro: tipoSel?.requiereSiniestro ? { ...d.siniestro, franquicia: d.siniestro.franquicia ? Number(d.siniestro.franquicia) : null } : null,
       }),
     );
     fd.set("firma", firma);
     fotos.forEach((f) => fd.append("fotos", f));
     startEnviar(async () => {
+      borrarBorrador(); // si falla, se vuelve a guardar con el siguiente cambio
       const r = await crearRecepcion(fd);
-      if (r?.error) setError(r.error);
+      if (r?.error) {
+        setError(r.error);
+        guardarBorrador({ d, paso, busquedaHecha });
+      }
     });
   }
 
@@ -211,6 +273,12 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
         ))}
       </ol>
 
+      {recuperado && (
+        <div className="mb-4 rounded-xl bg-sky-50 text-sky-900 text-sm p-3 flex flex-wrap items-center gap-3">
+          <span className="flex-1">Se ha recuperado la recepción que estaba a medias. Las fotos y la firma hay que volver a hacerlas.</span>
+          <button type="button" onClick={descartarBorrador} className="font-semibold underline min-h-10">Empezar de cero</button>
+        </div>
+      )}
       <Tarjeta className="p-4 md:p-6">
         {paso === 0 && (
           <div className="space-y-5">
@@ -259,13 +327,35 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
                 </fieldset>
                 <fieldset className="grid sm:grid-cols-2 gap-4">
                   <legend className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">Cliente</legend>
-                  <Campo etiqueta="Nombre y apellidos / razón social" className="sm:col-span-2"><Input value={d.clienteNombre} onChange={(e) => set("clienteNombre", e.target.value)} /></Campo>
-                  <Campo etiqueta="NIF / DNI"><Input value={d.clienteNif} onChange={(e) => set("clienteNif", e.target.value.toUpperCase())} /></Campo>
-                  <Campo etiqueta="Teléfono"><Input type="tel" value={d.clienteTelefono} onChange={(e) => set("clienteTelefono", e.target.value)} /></Campo>
-                  <Campo etiqueta="Email" className="sm:col-span-2"><Input type="email" value={d.clienteEmail} onChange={(e) => set("clienteEmail", e.target.value)} /></Campo>
-                  <div className="sm:col-span-2 flex flex-wrap gap-4 text-sm">
-                    <label className="flex items-center gap-2"><input type="checkbox" className="size-5" checked={d.aceptaWhatsapp} onChange={(e) => set("aceptaWhatsapp", e.target.checked)} /> Acepta avisos por WhatsApp</label>
-                    <label className="flex items-center gap-2"><input type="checkbox" className="size-5" checked={d.aceptaEmail} onChange={(e) => set("aceptaEmail", e.target.checked)} /> Acepta avisos por email</label>
+                  <Campo etiqueta="Nombre y apellidos / razón social" className="sm:col-span-2 lg:col-span-1"><Input value={d.clienteNombre} onChange={(e) => set("clienteNombre", e.target.value)} className="text-lg" /></Campo>
+                  <Campo etiqueta="Teléfono" className="sm:col-span-2 lg:col-span-1"><TelefonoInput value={d.clienteTelefono} onChange={(v) => set("clienteTelefono", v)} className="[&_input]:text-lg" /></Campo>
+                  <div className="sm:col-span-2">
+                    <span className="block text-sm font-medium text-slate-700 mb-2">Cómo avisarle</span>
+                    <div className="flex flex-wrap gap-2">
+                      <Aviso on={d.aceptaLlamada} onClick={() => set("aceptaLlamada", !d.aceptaLlamada)} icono={<Phone className="size-4" />} color="#0f766e">Llamada</Aviso>
+                      <Aviso on={d.aceptaWhatsapp} onClick={() => set("aceptaWhatsapp", !d.aceptaWhatsapp)} icono={<MessageCircle className="size-4" />} color="#25D366">WhatsApp</Aviso>
+                      {d.clienteEmail && (
+                        <Aviso on={d.aceptaEmail} onClick={() => set("aceptaEmail", !d.aceptaEmail)} icono={<Mail className="size-4" />} color="#2563eb">Email</Aviso>
+                      )}
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <button type="button" onClick={() => setMasDatos((v) => !v)} className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900">
+                      <ChevronDown className={cx("size-4 transition", masDatos && "rotate-180")} />
+                      Más datos (DNI, email) <span className="text-slate-400 font-normal">· opcional</span>
+                    </button>
+                    {masDatos && (
+                      <div className="grid sm:grid-cols-2 gap-4 mt-3">
+                        <Campo etiqueta="NIF / DNI"><Input value={d.clienteNif} onChange={(e) => set("clienteNif", e.target.value.toUpperCase())} /></Campo>
+                        <Campo etiqueta="Email">
+                          <Input
+                            type="email"
+                            value={d.clienteEmail}
+                            onChange={(e) => setD((p) => ({ ...p, clienteEmail: e.target.value, aceptaEmail: p.clienteEmail ? p.aceptaEmail : !!e.target.value }))}
+                          />
+                        </Campo>
+                      </div>
+                    )}
                   </div>
                 </fieldset>
               </>
@@ -309,12 +399,18 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
               </fieldset>
             )}
 
-            <Campo etiqueta="Trabajo solicitado por el cliente">
-              <Textarea value={d.trabajo} onChange={(e) => set("trabajo", e.target.value)} rows={4} placeholder="Ej.: Revisión de los 90.000 km y ruido al girar a la derecha" />
+            <Campo
+              etiqueta="Detalles del trabajo (opcional)"
+              ayuda={tipoSel ? `Si lo dejas vacío, en el resguardo figurará «${tipoSel.nombre}».` : undefined}
+            >
+              <Textarea value={d.trabajo} onChange={(e) => set("trabajo", e.target.value)} rows={3} placeholder="Ej.: Revisión de los 90.000 km y ruido al girar a la derecha" />
             </Campo>
             <div className="grid sm:grid-cols-2 gap-4">
-              <Campo etiqueta="Fecha prevista de entrega"><Input type="date" value={d.fechaPrevista} onChange={(e) => set("fechaPrevista", e.target.value)} /></Campo>
-              <label className="flex items-center gap-2 text-sm self-end min-h-11">
+              <Campo etiqueta="Fecha y hora de recepción" ayuda="Cámbiala si el coche se dejó antes (p. ej. fuera de horario)">
+                <Input type="datetime-local" value={d.fechaEntrada} max={ahoraLocal()} onChange={(e) => set("fechaEntrada", e.target.value)} />
+              </Campo>
+              <Campo etiqueta="Fecha prevista de entrega"><Input type="date" value={d.fechaPrevista} min={d.fechaEntrada.slice(0, 10)} onChange={(e) => set("fechaPrevista", e.target.value)} /></Campo>
+              <label className="sm:col-span-2 flex items-center gap-2 text-sm min-h-11">
                 <input type="checkbox" className="size-5" checked={d.renunciaPresupuesto} onChange={(e) => set("renunciaPresupuesto", e.target.checked)} />
                 El cliente renuncia a presupuesto previo
               </label>
@@ -325,7 +421,7 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
         {paso === 2 && (
           <div className="space-y-6">
             <div className="grid sm:grid-cols-2 gap-4">
-              <Campo etiqueta="Kilómetros"><Input inputMode="numeric" value={d.km} onChange={(e) => set("km", e.target.value.replace(/\D/g, ""))} className="text-xl font-semibold tabular-nums" /></Campo>
+              <Campo etiqueta="Kilómetros"><KmInput value={d.km} onChange={(v) => set("km", v)} placeholder="125.000" className="text-xl font-semibold tabular-nums" /></Campo>
               <div>
                 <span className="block text-sm font-medium text-slate-700 mb-1">Combustible</span>
                 <SelectorCombustible value={d.combustible} onChange={(v) => set("combustible", v)} />
@@ -361,11 +457,12 @@ export function AsistenteRecepcion({ tipos, companias, prefill }: { tipos: Tipo[
                 </BloqueRevision>
                 <BloqueRevision titulo={PASOS[1]} onCambiar={() => irA(1)}>
                   <Fila t="Tipo">{tipoSel?.nombre}{d.siniestro.numeroSiniestro && tipoSel?.requiereSiniestro ? ` · ${companias.find((c) => c.id === d.siniestro.companiaId)?.nombre} ${d.siniestro.numeroSiniestro}` : ""}</Fila>
-                  <Fila t="Trabajo"><span className="whitespace-pre-line">{d.trabajo}</span></Fila>
+                  <Fila t="Trabajo"><span className="whitespace-pre-line">{d.trabajo.trim() || tipoSel?.nombre}</span></Fila>
+                  <Fila t="Recepción">{d.fechaEntrada && fmtFechaHora(new Date(d.fechaEntrada))}</Fila>
                   <Fila t="Presupuesto">{d.renunciaPresupuesto ? "Renuncia a presupuesto previo" : "Se facilitará presupuesto"}</Fila>
                 </BloqueRevision>
                 <BloqueRevision titulo={PASOS[2]} onCambiar={() => irA(2)}>
-                  <Fila t="Km / comb.">{Number(d.km).toLocaleString("es-ES")} km · {fmtCombustible(d.combustible)}</Fila>
+                  <Fila t="Km / comb.">{fmtKm(Number(d.km))} · {fmtCombustible(d.combustible)}</Fila>
                   <Fila t="Testigos">{d.testigos.join(", ") || "Ninguno"}</Fila>
                   <Fila t="Objetos">{d.objetos.join(", ") || "Ninguno"}</Fila>
                   <Fila t="Daños">{d.danos.length ? d.danos.map((x, i) => `${i + 1}. ${x.tipo} (${zonaDano(x)})`).join(" · ") : "Sin daños"}</Fila>
@@ -452,6 +549,53 @@ function Miniaturas({ fotos }: { fotos: File[] }) {
         <img key={u} src={u} alt={`Foto ${i + 1}`} className="aspect-square w-full rounded-lg object-cover" />
       ))}
     </div>
+  );
+}
+
+// ── Borrador en la sesión del navegador (se pierde al cerrar la pestaña; nunca incluye fotos ni firma) ──
+const CLAVE_BORRADOR = "taller:borrador-recepcion";
+type Borrador = { d: Record<string, unknown> & { matricula: string; citaId: string; fechaEntrada: string; clienteNif?: string; clienteEmail?: string }; paso: number; busquedaHecha: boolean };
+function leerBorrador(): Borrador | null {
+  try {
+    const v = sessionStorage.getItem(CLAVE_BORRADOR);
+    return v ? (JSON.parse(v) as Borrador) : null;
+  } catch {
+    return null;
+  }
+}
+function guardarBorrador(b: { d: object; paso: number; busquedaHecha: boolean }) {
+  try {
+    sessionStorage.setItem(CLAVE_BORRADOR, JSON.stringify(b));
+  } catch {
+    /* sin almacenamiento: no pasa nada */
+  }
+}
+function borrarBorrador() {
+  try {
+    sessionStorage.removeItem(CLAVE_BORRADOR);
+  } catch {
+    /* idem */
+  }
+}
+
+/** Fecha y hora actuales en formato de <input type="datetime-local"> (hora local del dispositivo). */
+function ahoraLocal() {
+  const n = new Date();
+  return new Date(n.getTime() - n.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function Aviso({ on, onClick, icono, color, children }: { on: boolean; onClick: () => void; icono: ReactNode; color: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cx("min-h-11 rounded-full px-4 text-sm font-semibold border-2 inline-flex items-center gap-2 transition", on ? "text-white border-transparent" : "bg-white border-slate-200 text-slate-500")}
+      style={on ? { background: color } : undefined}
+    >
+      {on ? <Check className="size-4" /> : icono}
+      {children}
+    </button>
   );
 }
 

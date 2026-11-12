@@ -1,6 +1,6 @@
 import { tiene } from "@/lib/puestos";
 import { requireSesion } from "@/lib/auth";
-import { listarOTsAbiertas, tiposConEstados, type OTResumen } from "@/lib/data";
+import { listarOTsAbiertas, mecanicos as listarMecanicos, tiposConEstados, type OTResumen } from "@/lib/data";
 import { OtTarjeta } from "@/components/ot-tarjeta";
 import { AutoRefresco } from "@/components/auto-refresco";
 import { BotonLink, Pastilla, Tarjeta, Vacio } from "@/components/ui";
@@ -10,7 +10,12 @@ export const dynamic = "force-dynamic";
 
 export default async function MisTrabajos() {
   const s = await requireSesion("misTrabajos");
-  const [mias, todas, tipos] = await Promise.all([listarOTsAbiertas(s.tid, { mecanicoId: s.uid }), tiene(s.puestos, "gestionTaller") ? listarOTsAbiertas(s.tid) : Promise.resolve([]), tiposConEstados(s.tid)]);
+  const [mias, todas, tipos, mecs] = await Promise.all([
+    listarOTsAbiertas(s.tid, { mecanicoId: s.uid }),
+    tiene(s.puestos, "gestionTaller") ? listarOTsAbiertas(s.tid) : Promise.resolve([]),
+    tiposConEstados(s.tid),
+    listarMecanicos(s.tid),
+  ]);
   const sinAsignar = todas.filter((o) => !o.mecanicoId);
 
   const siguienteDe = (o: OTResumen) => {
@@ -34,13 +39,15 @@ export default async function MisTrabajos() {
           <div key={o.id} className="space-y-2">
             <OtTarjeta ot={o} />
             <div className="grid grid-cols-[1fr_auto] gap-2">
-              {sig && !bloqueado && o.estadoMarca !== "listo" ? (
-                <AvanzarRapido otId={o.id} siguiente={sig} />
-              ) : (
-                <div className="text-sm text-slate-500 self-center px-2">
-                  {bloqueado ? <Pastilla color="#7c3aed">Esperando aprobación</Pastilla> : o.estadoMarca === "listo" ? <Pastilla color="#059669">Listo</Pastilla> : null}
-                </div>
-              )}
+              {/* Siempre montado: así el «Deshacer» sigue visible aunque el trabajo pase a «Listo» o a espera */}
+              <AvanzarRapido
+                otId={o.id}
+                actual={o.estadoNombre}
+                mecanicos={mecs}
+                yo={s.uid}
+                siguiente={sig && !bloqueado && o.estadoMarca !== "listo" ? sig : null}
+                etiqueta={bloqueado ? <Pastilla color="#7c3aed">Esperando aprobación</Pastilla> : o.estadoMarca === "listo" ? <Pastilla color="#059669">Listo</Pastilla> : null}
+              />
               <BotonLink variante="secundario" className="min-h-12" href={`/ot/${o.id}`}>Incidencia / fotos</BotonLink>
             </div>
           </div>

@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
-import { LogOut } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
 import { requireSesion } from "@/lib/auth";
 import { tallerPorId } from "@/lib/taller";
-import { nombresPuestos } from "@/lib/puestos";
+import { nombresPuestos, tiene } from "@/lib/puestos";
 import { Navegacion } from "@/components/navegacion";
 import { BarraLateral } from "@/components/barra-lateral";
 import { COOKIE_BARRA } from "@/lib/constantes";
 import { salir } from "@/app/login/actions";
+import Link from "next/link";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await requireSesion();
@@ -33,12 +34,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             )}
             <span className="font-bold truncate">{taller.nombre}</span>
           </span>
-          <form action={salir} className="flex items-center gap-1 text-sm shrink-0">
-            <span className="text-slate-300 truncate max-w-28">{s.nombre}</span>
+          <div className="flex items-center gap-1 shrink-0">
+          {tiene(s.puestos, "oficina") && (
+            <Link href="/buscar" className="grid place-items-center size-11 rounded-lg hover:bg-white/10" aria-label="Buscar">
+              <Search className="size-5" aria-hidden />
+            </Link>
+          )}
+          <form action={salir} className="flex items-center gap-1 text-sm">
+            <span className="text-slate-300 truncate max-w-24">{s.nombre}</span>
             <button className="grid place-items-center size-11 rounded-lg hover:bg-white/10" aria-label="Cambiar de usuario">
               <LogOut className="size-5" aria-hidden />
             </button>
           </form>
+          </div>
         </header>
         <main className="mx-auto max-w-7xl p-4 md:p-6">{children}</main>
       </div>

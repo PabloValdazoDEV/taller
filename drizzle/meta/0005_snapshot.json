@@ -1,6 +1,6 @@
 {
-  "id": "21d08ed5-8595-432c-a1ca-90332096ead2",
-  "prevId": "975fad6c-6499-4581-b445-58648c1ead35",
+  "id": "29330627-dcc9-4757-a020-082515c3ec18",
+  "prevId": "ed9df4c5-db78-4222-a1cd-aef0617238b7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -585,6 +585,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "acepta_llamada": {
+          "name": "acepta_llamada",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "acepta_whatsapp": {
           "name": "acepta_whatsapp",
           "type": "boolean",
@@ -995,6 +1002,12 @@
         },
         "garantia_texto": {
           "name": "garantia_texto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motivo_sin_reparar": {
+          "name": "motivo_sin_reparar",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1545,6 +1558,31 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "anulada_en": {
+          "name": "anulada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motivo_anulacion": {
+          "name": "motivo_anulacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avisado_listo_en": {
+          "name": "avisado_listo_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creada_en": {
+          "name": "creada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "actualizada_en": {
           "name": "actualizada_en",
@@ -2218,6 +2256,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "rol": {
+          "name": "rol",
+          "type": "rol",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "password_hash": {
           "name": "password_hash",
           "type": "text",
@@ -2447,6 +2492,16 @@
         "aseguradora",
         "cortesia",
         "cliente"
+      ]
+    },
+    "public.rol": {
+      "name": "rol",
+      "schema": "public",
+      "values": [
+        "admin",
+        "asesor",
+        "jefe_taller",
+        "mecanico"
       ]
     },
     "public.tipo_cliente": {

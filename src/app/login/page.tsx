@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db, t } from "@/db";
 import { tallerActual } from "@/lib/taller";
-import { nombresPuestos } from "@/lib/puestos";
+import { longitudPin, nombresPuestos } from "@/lib/puestos";
 import { PinLogin } from "./pin-login";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export default async function LoginPage() {
           <h1 className="text-2xl font-bold">{taller.nombre}</h1>
           <p className="text-slate-500">¿Quién eres?</p>
         </div>
-        <PinLogin usuarios={usuarios.map((u) => ({ id: u.id, nombre: u.nombre, color: u.color, rolNombre: nombresPuestos(u.puestos) }))} />
+        <PinLogin usuarios={usuarios.map((u) => ({ id: u.id, nombre: u.nombre, color: u.color, rolNombre: nombresPuestos(u.puestos), cifras: longitudPin(u.puestos) }))} />
       </div>
     </main>
   );

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db, t } from "@/db";
 import { requireSesion } from "@/lib/auth";
 import { auditar } from "@/lib/auditoria";
-import { esPuesto, type Puesto } from "@/lib/puestos";
+import { esPuesto, longitudPin, type Puesto } from "@/lib/puestos";
 import { normalizarMatricula } from "@/lib/data";
 import { DanosZ } from "@/lib/danos";
 import type { Dano } from "@/db/schema";
@@ -24,7 +24,7 @@ const EmpleadoZ = z.object({
   nombre: z.string().trim().min(2, "El nombre es obligatorio").max(40, "Nombre demasiado largo"),
   color: z.string().regex(/^#[0-9a-f]{6}$/i, "Color no válido"),
   puestos: z.array(z.string()).min(1, "Marca al menos un puesto"),
-  pin: z.string().regex(/^\d{4}$/, "El PIN debe tener 4 cifras").nullable(),
+  pin: z.string().regex(/^\d+$/, "El PIN solo lleva cifras").nullable(),
 });
 
 /** ¿Quedaría el taller sin nadie de dirección activo si a `exceptoId` le quitamos dirección o lo damos de baja? */
@@ -48,6 +48,9 @@ export async function guardarEmpleado(fd: FormData): Promise<R> {
   if (!v.success) return { error: v.error.issues[0].message };
   const puestos = v.data.puestos.filter(esPuesto) as Puesto[];
   if (!puestos.length) return { error: "Marca al menos un puesto" };
+  // Dirección y jefe de taller llevan PIN de 6 cifras; el resto, de 4
+  const cifras = longitudPin(puestos);
+  if (v.data.pin && v.data.pin.length !== cifras) return { error: `Con estos puestos el PIN debe tener ${cifras} cifras` };
 
   // Nombre único entre los activos (en la pantalla de acceso se elige por nombre)
   const repetido = await db.query.usuarios.findFirst({
@@ -56,7 +59,7 @@ export async function guardarEmpleado(fd: FormData): Promise<R> {
   if (repetido) return { error: `Ya hay un empleado activo llamado «${repetido.nombre}»` };
 
   if (!id) {
-    if (!v.data.pin) return { error: "Indica un PIN de 4 cifras" };
+    if (!v.data.pin) return { error: `Indica un PIN de ${cifras} cifras` };
     const [u] = await db
       .insert(t.usuarios)
       .values({ tallerId: s.tid, nombre: v.data.nombre, color: v.data.color, puestos, pinHash: await bcrypt.hash(v.data.pin, 10) })
@@ -67,6 +70,7 @@ export async function guardarEmpleado(fd: FormData): Promise<R> {
     if (!actual) return { error: "Empleado no encontrado" };
     if (actual.puestos.includes("direccion") && !puestos.includes("direccion") && actual.activo && (await quedaSinDireccion(s.tid, id)))
       return { error: "Tiene que quedar al menos una persona con el puesto de Dirección" };
+    if (!v.data.pin && longitudPin(actual.puestos) !== cifras) return { error: `Con estos puestos su PIN pasa a tener ${cifras} cifras: ponle un PIN nuevo` };
     await db
       .update(t.usuarios)
       .set({ nombre: v.data.nombre, color: v.data.color, puestos, ...(v.data.pin ? { pinHash: await bcrypt.hash(v.data.pin, 10) } : {}) })

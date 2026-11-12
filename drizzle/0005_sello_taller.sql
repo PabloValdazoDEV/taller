@@ -1,1 +1,0 @@
-ALTER TABLE "talleres" ADD COLUMN "sello_ruta" text;

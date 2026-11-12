@@ -1,5 +1,31 @@
+import { telefonoInternacional } from "./telefono";
+
+/** Zona horaria del taller: el servidor puede estar en UTC, pero todo se muestra y calcula en hora de Madrid. */
+export const ZONA = "Europe/Madrid";
+
+/** Fecha de hoy (o de `d`) en hora de Madrid, formato YYYY-MM-DD. */
+export const diaISO = (d: Date = new Date()) => new Intl.DateTimeFormat("sv-SE", { timeZone: ZONA }).format(d);
+
+/** Días naturales transcurridos desde `d` hasta hoy (hora de Madrid). */
+export const diasDesde = (d: Date | string) => Math.max(0, Math.round((Date.parse(diaISO()) - Date.parse(diaISO(new Date(d)))) / 86_400_000));
+
+/** Instante en que empieza el día `diaIso` (YYYY-MM-DD) en hora de Madrid. */
+export function inicioDia(diaIso: string) {
+  const utc = new Date(`${diaIso}T00:00:00Z`);
+  const enMadrid = Date.parse(utc.toLocaleString("en-US", { timeZone: ZONA }));
+  const enUtc = Date.parse(utc.toLocaleString("en-US", { timeZone: "UTC" }));
+  return new Date(utc.getTime() - (enMadrid - enUtc));
+}
+
+export const fmtHora = (d: Date | string) => new Date(d).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: ZONA });
+
 export const fmtFecha = (d: Date | string | null | undefined) =>
-  d ? new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+  d
+    ? // Las fechas sin hora («2026-11-12») se muestran tal cual, sin desplazarlas por zona horaria
+      typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)
+      ? d.split("-").reverse().join("/")
+      : new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: ZONA })
+    : "—";
 
 export const fmtFechaHora = (d: Date | string | null | undefined) =>
   d
@@ -9,10 +35,14 @@ export const fmtFechaHora = (d: Date | string | null | undefined) =>
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: ZONA,
       })
     : "—";
 
-export const fmtKm = (km: number | null | undefined) => (km == null ? "—" : `${km.toLocaleString("es-ES")} km`);
+/** Separador de miles con punto, también a partir de 1.000 (es-ES no agrupa los números de 4 cifras). */
+export const fmtMiles = (n: number | string | null | undefined) =>
+  n == null || n === "" ? "" : String(n).replace(/\D/g, "").replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+export const fmtKm = (km: number | null | undefined) => (km == null ? "—" : `${fmtMiles(km)} km`);
 
 export const fmtCombustible = (octavos: number | null | undefined) => {
   if (octavos == null) return "—";
@@ -49,8 +79,7 @@ export function aniosDesde(fechaISO: string, hoy = new Date()) {
 
 /** Enlace wa.me con mensaje (envío manual desde el móvil del taller, sin API) */
 export function enlaceWhatsapp(telefono: string | null | undefined, texto: string) {
-  if (!telefono) return null;
-  let n = telefono.replace(/\D/g, "");
-  if (n.length === 9) n = "34" + n;
+  const n = telefonoInternacional(telefono);
+  if (!n) return null;
   return `https://wa.me/${n}?text=${encodeURIComponent(texto)}`;
 }

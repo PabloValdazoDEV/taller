@@ -1,5 +1,5 @@
 {
-  "id": "dac0dd58-c545-49ba-98ab-1fec5a9c13d6",
+  "id": "4f8b89c2-cd4c-4638-8aba-59f3cb7ea442",
   "prevId": "adfc11e7-47a1-4a20-b6f2-3b11d3dc83f8",
   "version": "7",
   "dialect": "postgresql",
@@ -585,6 +585,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "acepta_llamada": {
+          "name": "acepta_llamada",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "acepta_whatsapp": {
           "name": "acepta_whatsapp",
           "type": "boolean",
@@ -725,13 +732,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "activo": {
-          "name": "activo",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         }
       },
       "indexes": {},
@@ -2223,13 +2223,6 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
-        },
-        "puestos": {
-          "name": "puestos",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
         },
         "color": {
           "name": "color",

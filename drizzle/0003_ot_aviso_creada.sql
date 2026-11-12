@@ -1,0 +1,2 @@
+ALTER TABLE "ordenes_trabajo" ADD COLUMN "avisado_listo_en" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "ordenes_trabajo" ADD COLUMN "creada_en" timestamp with time zone DEFAULT now() NOT NULL;

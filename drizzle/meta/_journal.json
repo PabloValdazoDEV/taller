@@ -19,29 +19,36 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1794398654751,
-      "tag": "0002_puestos",
+      "when": 1794429228782,
+      "tag": "0002_avisos_llamada",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1794398665322,
-      "tag": "0003_quitar_rol",
+      "when": 1794433207146,
+      "tag": "0003_ot_aviso_creada",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1794401988034,
-      "tag": "0004_danos_coche_sustitucion",
+      "when": 1794444766647,
+      "tag": "0004_anular_sin_reparar",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "7",
-      "when": 1794412848319,
-      "tag": "0005_sello_taller",
+      "when": 1794472471969,
+      "tag": "0005_puestos_sello_danos",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794472472953,
+      "tag": "0006_quitar_rol",
       "breakpoints": true
     }
   ]

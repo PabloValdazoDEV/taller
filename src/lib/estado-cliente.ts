@@ -1,7 +1,7 @@
 // Traduce el estado interno de una orden a lo que se le cuenta al cliente (teléfono, enlace de seguimiento).
 // Los estados internos (Chapa, Pintura, Montaje…) se agrupan para no confundir al cliente.
 
-import { fmtFecha } from "./formato";
+import { diaISO, fmtFecha } from "./formato";
 
 export type FaseCliente = "recibido" | "diagnostico" | "aprobacion" | "peritaje" | "piezas" | "reparacion" | "calidad" | "listo" | "entregado";
 
@@ -80,5 +80,5 @@ export function queDecirle(
   return partes.join(" ");
 }
 
-/** Fecha local del servidor en formato AAAA-MM-DD. */
-export const hoyISO = () => new Date().toLocaleDateString("sv-SE");
+/** Hoy en formato AAAA-MM-DD, en hora de Madrid (el servidor puede estar en UTC). */
+export const hoyISO = () => diaISO();

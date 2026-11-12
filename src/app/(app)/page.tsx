@@ -8,8 +8,10 @@ import { requireSesion } from "@/lib/auth";
 import { actividadSemana, citasDelDia, entregadosRecientes, flotaSustitucion, incidenciasAbiertas, listarOTsAbiertas, mecanicos } from "@/lib/data";
 import { tallerPorId } from "@/lib/taller";
 import { nombresPuestos, tiene, type Puesto } from "@/lib/puestos";
-import { hoyISO } from "@/lib/estado-cliente";
-import { enlaceWhatsapp, fmtFecha, fmtFechaHora, TIPO_INCIDENCIA } from "@/lib/formato";
+import { esperaAprobacionOPerito, esRetrasada } from "@/lib/ots";
+import { mensajeListo } from "@/lib/mensajes";
+import { AvisoListo } from "@/components/aviso-listo";
+import { diaISO, enlaceWhatsapp, fmtFecha, fmtFechaHora, fmtHora, TIPO_INCIDENCIA, ZONA } from "@/lib/formato";
 import { BotonLink, Matricula, Pastilla, Tarjeta, TituloSeccion, Vacio, cx } from "@/components/ui";
 import { OtTarjeta } from "@/components/ot-tarjeta";
 import { BuscadorGlobal } from "@/components/buscador-global";
@@ -26,7 +28,6 @@ const ve = (puestos: Puesto[], ...para: Puesto[]) => puestos.some((p) => para.in
 export default async function Inicio() {
   const s = await requireSesion("oficina");
   const P = s.puestos;
-  const hoy = hoyISO();
 
   const [ots, citas, flota, taller, semana, entregados, incidencias, mecs] = await Promise.all([
     listarOTsAbiertas(s.tid),
@@ -40,13 +41,12 @@ export default async function Inicio() {
   ]);
 
   const listos = ots.filter((o) => o.estadoMarca === "listo");
-  const retrasados = ots.filter((o) => o.fechaPrevista && o.fechaPrevista < hoy && o.estadoMarca !== "listo");
-  const esperando = ots.filter((o) => o.requiereAprobacion || /perit|autoriza/i.test(o.estadoNombre));
+  const retrasados = ots.filter(esRetrasada);
+  const esperando = ots.filter(esperaAprobacionOPerito);
   const sinAsignar = ots.filter((o) => !o.mecanicoId && o.estadoMarca !== "listo");
   const prestados = flota.filter((c) => c.estado === "prestado").length;
-  const en30 = new Date(Date.now() + 30 * 86400_000).toLocaleDateString("sv-SE");
+  const en30 = diaISO(new Date(Date.now() + 30 * 86400_000));
   const alertasFlota = flota.filter((c) => (c.itvHasta && c.itvHasta < en30) || (c.seguroHasta && c.seguroHasta < en30));
-  const horario = taller.config.horario ? ` Horario: ${taller.config.horario}.` : "";
 
   // Clientes a llamar: retrasados (avisar del nuevo plazo) y pendientes de su aprobación
   const aLlamar = [
@@ -56,16 +56,16 @@ export default async function Inicio() {
 
   const kpis: { t: string; v: string | number; i: typeof Car; c: string; href?: string }[] = [
     { t: "En taller", v: ots.length, i: Car, c: "text-slate-700", href: "/tablero" },
-    { t: "Listos para entregar", v: listos.length, i: CheckCircle2, c: "text-emerald-700" },
-    { t: "Retrasados", v: retrasados.length, i: Clock, c: retrasados.length ? "text-red-700" : "text-slate-700" },
-    { t: "Esperando aprobación o perito", v: esperando.length, i: Hourglass, c: "text-violet-700" },
+    { t: "Listos para entregar", v: listos.length, i: CheckCircle2, c: "text-emerald-700", href: "/tablero?filtro=listos" },
+    { t: "Retrasados", v: retrasados.length, i: Clock, c: retrasados.length ? "text-red-700" : "text-slate-700", href: "/tablero?filtro=retrasados" },
+    { t: "Esperando aprobación o perito", v: esperando.length, i: Hourglass, c: "text-violet-700", href: "/tablero?filtro=espera" },
   ];
   if (semana)
     kpis.push(
       { t: "Entradas esta semana", v: semana.entradas, i: ArrowDownToLine, c: "text-slate-700" },
       { t: "Entregados esta semana", v: semana.salidas, i: ArrowUpFromLine, c: "text-slate-700" },
       { t: "Coches de sustitución en uso", v: `${prestados}/${flota.length}`, i: Car, c: "text-slate-700", href: "/sustitucion" },
-      { t: "Incidencias abiertas", v: incidencias.length, i: AlertTriangle, c: incidencias.length ? "text-amber-700" : "text-slate-700" },
+      { t: "Incidencias abiertas", v: incidencias.length, i: AlertTriangle, c: incidencias.length ? "text-amber-700" : "text-slate-700", href: "/tablero?filtro=incidencias" },
     );
 
   // ── Bloques de la columna principal ──
@@ -79,10 +79,7 @@ export default async function Inicio() {
         ) : (
           <Tarjeta className="divide-y divide-slate-100">
             {listos.map((o) => {
-              const wa = enlaceWhatsapp(
-                o.clienteTelefono,
-                `Hola ${o.clienteNombre.split(" ")[0]}, le escribimos de ${taller.nombre}. Su vehículo ${o.marca ?? ""} ${o.modelo ?? ""} (${o.matricula}) ya está listo para recoger.${horario} ¡Gracias!`,
-              );
+              const wa = enlaceWhatsapp(o.clienteTelefono, mensajeListo(taller, o));
               return (
                 <div key={o.id} className="flex flex-wrap items-center gap-3 p-3">
                   <Matricula>{o.matricula}</Matricula>
@@ -90,11 +87,14 @@ export default async function Inicio() {
                     <div className="text-sm font-semibold">{o.marca} {o.modelo}</div>
                     <div className="text-xs text-slate-500">{o.clienteNombre}</div>
                   </Link>
-                  {wa && (
-                    <a href={wa} target="_blank" rel="noopener" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
-                      <MessageCircle className="size-4 text-[#128C7E]" aria-hidden /> Avisar
-                    </a>
-                  )}
+                  <AvisoListo
+                    otId={o.id}
+                    enlaceWa={wa}
+                    telefono={o.clienteTelefono}
+                    aceptaWhatsapp={o.clienteAceptaWhatsapp}
+                    aceptaLlamada={o.clienteAceptaLlamada}
+                    avisadoEn={o.avisadoListoEn}
+                  />
                   {tiene(P, "recepcion") && <BotonLink href={`/ot/${o.id}/entrega`} variante="exito" className="min-h-10">Entregar</BotonLink>}
                 </div>
               );
@@ -184,7 +184,7 @@ export default async function Inicio() {
           {citas.length === 0 && <Vacio>Sin citas hoy.</Vacio>}
           {citas.map(({ c, tipoNombre, tipoColor }) => (
             <div key={c.id} className="flex items-center gap-3 p-3">
-              <div className="w-12 text-sm font-bold tabular-nums">{new Date(c.fechaHora).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</div>
+              <div className="w-12 text-sm font-bold tabular-nums">{fmtHora(c.fechaHora)}</div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{c.contacto}</div>
                 <div className="truncate text-xs text-slate-500">{c.motivo}</div>
@@ -297,7 +297,7 @@ export default async function Inicio() {
 }
 
 function fechaLarga() {
-  const f = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+  const f = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: ZONA });
   return f.charAt(0).toUpperCase() + f.slice(1);
 }
 

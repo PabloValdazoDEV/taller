@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -42,10 +42,12 @@ const Esquema = z.object({
   clienteNif: opcional,
   clienteTelefono: opcional,
   clienteEmail: z.string().trim().email("Email no válido").optional().or(z.literal("")).transform((v) => v || null),
+  aceptaLlamada: z.coerce.boolean().optional(),
   aceptaWhatsapp: z.coerce.boolean().optional(),
   aceptaEmail: z.coerce.boolean().optional(),
   tipoOrdenId: z.string().uuid("Elige el tipo de orden"),
-  trabajo: z.string().trim().min(3, "Describe el trabajo solicitado"),
+  trabajo: opcional,
+  fechaEntrada: z.coerce.date().optional(),
   fechaPrevista: opcional,
   renunciaPresupuesto: z.coerce.boolean().optional(),
   km: entero,
@@ -107,8 +109,31 @@ export async function crearRecepcion(fd: FormData): Promise<{ error?: string }> 
     };
   }
 
-  const ev = await prepararEvidencia(s, datos.firmante);
+  // Fecha de recepción: la indicada (p. ej. coche dejado fuera de horario), nunca futura
+  const ahora = new Date();
+  const fechaEntrada = datos.fechaEntrada && !isNaN(datos.fechaEntrada.getTime()) && datos.fechaEntrada <= ahora ? datos.fechaEntrada : ahora;
+  const trabajo = datos.trabajo ?? tipo.nombre;
+
   const matricula = normalizarMatricula(datos.matricula);
+  // Doble envío (doble toque, reintento tras un corte): si esta misma persona acaba de abrir una orden
+  // para esta matrícula, se lleva a ella en vez de crear otra.
+  const reciente = await db
+    .select({ id: t.ordenesTrabajo.id })
+    .from(t.ordenesTrabajo)
+    .innerJoin(t.vehiculos, eq(t.vehiculos.id, t.ordenesTrabajo.vehiculoId))
+    .where(
+      and(
+        eq(t.ordenesTrabajo.tallerId, s.tid),
+        eq(t.vehiculos.matricula, matricula),
+        eq(t.ordenesTrabajo.asesorId, s.uid),
+        isNull(t.ordenesTrabajo.cerradaEn),
+        gt(t.ordenesTrabajo.creadaEn, new Date(Date.now() - 2 * 60_000)),
+      ),
+    )
+    .limit(1);
+  if (reciente.length) redirect(`/ot/${reciente[0].id}?nueva=1`);
+
+  const ev = await prepararEvidencia(s, datos.firmante);
 
   const otId = await db.transaction(async (tx) => {
     // Cliente: existente (se actualizan contacto/consentimientos) o nuevo
@@ -118,6 +143,7 @@ export async function crearRecepcion(fd: FormData): Promise<{ error?: string }> 
       nif: datos.clienteNif,
       telefono: datos.clienteTelefono,
       email: datos.clienteEmail,
+      aceptaLlamada: !!datos.aceptaLlamada,
       aceptaWhatsapp: !!datos.aceptaWhatsapp,
       aceptaEmail: !!datos.aceptaEmail,
     };
@@ -153,8 +179,9 @@ export async function crearRecepcion(fd: FormData): Promise<{ error?: string }> 
         clienteId: clienteId!,
         vehiculoId: vehiculoId!,
         asesorId: s.uid,
+        fechaEntrada,
         fechaPrevista: datos.fechaPrevista,
-        trabajoSolicitado: datos.trabajo,
+        trabajoSolicitado: trabajo,
         datosSiniestro: siniestro,
       })
       .returning();
@@ -203,7 +230,8 @@ export async function crearRecepcion(fd: FormData): Promise<{ error?: string }> 
         objetos: datos.objetos,
         danos: datos.danos as Dano[],
         observaciones: datos.observaciones,
-        trabajoSolicitado: datos.trabajo,
+        trabajoSolicitado: trabajo,
+        fechaEntrada,
         fechaPrevista: datos.fechaPrevista,
         renunciaPresupuesto: !!datos.renunciaPresupuesto,
         siniestro,

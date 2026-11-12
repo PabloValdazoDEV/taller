@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   title: "Gestión de Taller",
   description: "Recepción, taller, incidencias y entrega de vehículos",
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/icono-192.png", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Taller", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

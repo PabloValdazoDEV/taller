@@ -30,12 +30,17 @@ const PERMISOS = {
   forzarPrestamo: ["direccion", "jefe_taller"],
   sustitucion: ["direccion", "recepcion", "telefono", "jefe_taller"],
   configuracion: ["direccion"],
+  /** Anular una orden dada de alta por error */
+  anularOrden: ["direccion"],
 } satisfies Record<string, Puesto[]>;
 export type Permiso = keyof typeof PERMISOS;
 
 export function tiene(puestos: readonly Puesto[], permiso: Permiso) {
   return puestos.some((p) => (PERMISOS[permiso] as readonly Puesto[]).includes(p));
 }
+
+/** Cifras del PIN según los puestos: las cuentas con más permisos (dirección, jefe de taller) llevan un PIN más largo. */
+export const longitudPin = (puestos: readonly Puesto[]) => (puestos.includes("direccion") || puestos.includes("jefe_taller") ? 6 : 4);
 
 /** Pantalla a la que va cada persona al entrar. */
 export function inicioDe(puestos: readonly Puesto[]) {

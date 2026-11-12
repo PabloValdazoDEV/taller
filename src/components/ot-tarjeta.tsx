@@ -2,12 +2,13 @@ import Link from "next/link";
 import { AlertTriangle, CalendarClock, ShieldCheck } from "lucide-react";
 import { Matricula, Pastilla, cx } from "./ui";
 import { LogoMarca } from "./selector-marca-modelo";
-import { fmtFecha } from "@/lib/formato";
+import { diasDesde, fmtFecha } from "@/lib/formato";
+import { esRetrasada } from "@/lib/ots";
 import type { OTResumen } from "@/lib/data";
 
 export function OtTarjeta({ ot, mostrarEstado = true, compacta = false }: { ot: OTResumen; mostrarEstado?: boolean; compacta?: boolean }) {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const retrasada = ot.fechaPrevista && ot.fechaPrevista < hoy && ot.estadoMarca !== "listo";
+  const retrasada = esRetrasada(ot);
+  const dias = diasDesde(ot.fechaEntrada);
   return (
     <Link
       href={`/ot/${ot.id}`}
@@ -15,8 +16,16 @@ export function OtTarjeta({ ot, mostrarEstado = true, compacta = false }: { ot: 
       style={{ borderLeft: `4px solid ${ot.tipoColor}` }}
     >
       <div className="flex items-center justify-between gap-2">
-        <Matricula>{ot.matricula}</Matricula>
-        <span className="text-xs text-slate-400 font-mono">{ot.numero}</span>
+        <span className="shrink-0 whitespace-nowrap"><Matricula>{ot.matricula}</Matricula></span>
+        <span className="flex items-center gap-2 min-w-0 whitespace-nowrap">
+          <span
+            className={cx("shrink-0 text-[11px] font-semibold rounded-full px-1.5", dias >= 10 ? "bg-red-50 text-red-700" : dias >= 5 ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500")}
+            title={`Lleva ${dias} día(s) en el taller`}
+          >
+            {dias === 0 ? "hoy" : `${dias} d`}
+          </span>
+          <span className="text-xs text-slate-400 font-mono truncate">{ot.numero}</span>
+        </span>
       </div>
       <div className="mt-1.5 font-semibold text-sm truncate flex items-center gap-1.5">
         {ot.marca && <LogoMarca marca={ot.marca} className="size-5 shrink-0" />}
@@ -30,6 +39,11 @@ export function OtTarjeta({ ot, mostrarEstado = true, compacta = false }: { ot: 
             <ShieldCheck className="size-3.5" /> {ot.datosSiniestro.companiaNombre}
           </span>
         )}
+        {ot.averiasPendientes > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-600 text-white px-2 py-0.5 text-[11px] font-semibold" title="Avería adicional pendiente de que el cliente la apruebe">
+            Aprobación extra
+          </span>
+        )}
         {ot.incidenciasAbiertas > 0 && (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
             <AlertTriangle className="size-3.5" /> {ot.incidenciasAbiertas}
@@ -38,7 +52,7 @@ export function OtTarjeta({ ot, mostrarEstado = true, compacta = false }: { ot: 
       </div>
       <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
         <span className={cx("inline-flex items-center gap-1", retrasada && "text-red-600 font-semibold")}>
-          <CalendarClock className="size-3.5" /> {fmtFecha(ot.fechaPrevista)}
+          <CalendarClock className="size-3.5" /> {retrasada && "Retrasado · "}{fmtFecha(ot.fechaPrevista)}
         </span>
         {ot.mecanicoNombre ? (
           <span className="inline-flex items-center gap-1">
