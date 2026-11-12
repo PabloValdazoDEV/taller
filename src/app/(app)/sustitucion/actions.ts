@@ -9,9 +9,12 @@ import type { Dano } from "@/db/schema";
 import { requireSesion } from "@/lib/auth";
 import { auditar } from "@/lib/auditoria";
 import { tallerPorId } from "@/lib/taller";
-import { aniosDesde } from "@/lib/formato";
+import { aniosDesde, diaISO, fmtFecha } from "@/lib/formato";
 import { guardarDocumento, prepararEvidencia, tallerParaPdf, validarFirma } from "@/lib/pdf/generar";
 import { PrestamoPdf } from "@/lib/pdf/plantillas";
+
+/** Error esperado dentro de una transacción (se devuelve al usuario en vez de dar un error 500). */
+class Conflicto extends Error {}
 
 const DanosZ = z.array(z.object({ x: z.number(), y: z.number(), tipo: z.string(), nota: z.string().optional(), vista: z.enum(["superior", "izquierdo", "derecho", "frontal", "trasera"]).optional() }));
 const PAGADOR: Record<string, string> = { aseguradora: "Aseguradora (póliza)", cortesia: "Cortesía del taller", cliente: "Cliente" };
@@ -51,16 +54,24 @@ export async function crearPrestamo(fd: FormData): Promise<{ error?: string }> {
   ]);
   if (!ot || ot.cerradaEn) return { error: "Orden no válida" };
   if (!coche || coche.estado !== "disponible") return { error: "El coche no está disponible" };
+  const hoy = diaISO();
+  if (coche.itvHasta && coche.itvHasta < hoy) return { error: `El coche tiene la ITV caducada (${fmtFecha(coche.itvHasta)})` };
+  if (coche.seguroHasta && coche.seguroHasta < hoy) return { error: `El seguro del coche está caducado (${fmtFecha(coche.seguroHasta)})` };
 
   const ev = await prepararEvidencia(s, d.conductorNombre);
-  const prestamoId = await db.transaction(async (tx) => {
+  let prestamoId: string;
+  try {
+  prestamoId = await db.transaction(async (tx) => {
+    // Una orden no puede tener dos coches prestados a la vez (también protege del doble toque)
+    const activo = await tx.query.prestamos.findFirst({ where: and(eq(t.prestamos.tallerId, s.tid), eq(t.prestamos.otId, ot.id), isNull(t.prestamos.devueltoEn)) });
+    if (activo) throw new Conflicto("Esta orden ya tiene un coche de sustitución prestado");
     // Bloqueo optimista: solo se presta si sigue disponible
     const ok = await tx
       .update(t.cochesSustitucion)
       .set({ estado: "prestado" })
       .where(and(eq(t.cochesSustitucion.id, coche.id), eq(t.cochesSustitucion.estado, "disponible")))
       .returning({ id: t.cochesSustitucion.id });
-    if (!ok.length) throw new Error("El coche acaba de ser prestado");
+    if (!ok.length) throw new Conflicto("El coche acaba de ser prestado");
 
     const doc = await guardarDocumento(
       tx, s, ev, "prestamo_salida", ot.id,
@@ -100,6 +111,10 @@ export async function crearPrestamo(fd: FormData): Promise<{ error?: string }> {
       .returning();
     return p.id;
   });
+  } catch (e) {
+    if (e instanceof Conflicto) return { error: e.message };
+    throw e;
+  }
 
   await auditar(s, "prestar_coche", "prestamo", prestamoId, { coche: coche.matricula, forzado: !cumple });
   revalidatePath("/", "layout");
@@ -131,7 +146,15 @@ export async function devolverPrestamo(fd: FormData): Promise<{ error?: string }
   const taller = await tallerPorId(s.tid);
   const ev = await prepararEvidencia(s, d.firmante);
 
+  try {
   await db.transaction(async (tx) => {
+    // Primero se marca como devuelto SOLO si no lo estaba: un doble envío no genera dos actas
+    const marcado = await tx
+      .update(t.prestamos)
+      .set({ devueltoEn: new Date() })
+      .where(and(eq(t.prestamos.id, p.id), isNull(t.prestamos.devueltoEn)))
+      .returning({ id: t.prestamos.id });
+    if (!marcado.length) throw new Conflicto("Este préstamo ya se ha devuelto");
     const doc = await guardarDocumento(
       tx, s, ev, "prestamo_devolucion", p.otId,
       PrestamoPdf({
@@ -156,12 +179,36 @@ export async function devolverPrestamo(fd: FormData): Promise<{ error?: string }
     );
     await tx
       .update(t.prestamos)
-      .set({ kmLlegada: d.kmLlegada, combLlegada: d.combLlegada, danosLlegada: d.danos as Dano[], observacionesLlegada: d.observaciones || null, docLlegadaId: doc.id, devueltoEn: new Date() })
+      .set({ kmLlegada: d.kmLlegada, combLlegada: d.combLlegada, danosLlegada: d.danos as Dano[], observacionesLlegada: d.observaciones || null, docLlegadaId: doc.id })
       .where(eq(t.prestamos.id, p.id));
     await tx.update(t.cochesSustitucion).set({ estado: "disponible", km: d.kmLlegada, combustible: d.combLlegada }).where(eq(t.cochesSustitucion.id, coche.id));
   });
+  } catch (e) {
+    if (e instanceof Conflicto) return { error: e.message };
+    throw e;
+  }
 
   await auditar(s, "devolver_coche", "prestamo", p.id, { km: d.kmLlegada - p.kmSalida, nuevosDanos: d.danos.length - p.danosSalida.length });
   revalidatePath("/", "layout");
   redirect(p.otId ? `/ot/${p.otId}` : "/sustitucion");
+}
+
+/** Pasa un coche disponible a mantenimiento (no se puede prestar) o lo vuelve a dejar disponible. */
+export async function cambiarMantenimiento(cocheId: string, enMantenimiento: boolean): Promise<{ error?: string }> {
+  const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
+  const r = await db
+    .update(t.cochesSustitucion)
+    .set({ estado: enMantenimiento ? "mantenimiento" : "disponible" })
+    .where(
+      and(
+        eq(t.cochesSustitucion.tallerId, s.tid),
+        eq(t.cochesSustitucion.id, cocheId),
+        eq(t.cochesSustitucion.estado, enMantenimiento ? "disponible" : "mantenimiento"),
+      ),
+    )
+    .returning({ matricula: t.cochesSustitucion.matricula });
+  if (!r.length) return { error: enMantenimiento ? "Solo se puede pasar a mantenimiento un coche disponible" : "El coche no estaba en mantenimiento" };
+  await auditar(s, enMantenimiento ? "coche_mantenimiento" : "coche_disponible", "coche", cocheId, { matricula: r[0].matricula });
+  revalidatePath("/", "layout");
+  return {};
 }

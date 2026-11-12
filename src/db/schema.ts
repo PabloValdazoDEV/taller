@@ -73,6 +73,10 @@ export type TallerConfig = {
   garantiaTexto?: string;
   prestamoEdadMinima?: number;
   prestamoAniosCarnet?: number;
+  /** Horario de recogida que se incluye en los avisos al cliente */
+  horario?: string;
+  /** Taller de demostración (el seed solo puede borrar talleres marcados así) */
+  demo?: boolean;
 };
 
 export const usuarios = pgTable(
@@ -104,6 +108,7 @@ export const clientes = pgTable(
     direccion: text("direccion"),
     exentoIva: boolean("exento_iva").notNull().default(false),
     motivoExencion: text("motivo_exencion"),
+    aceptaLlamada: boolean("acepta_llamada").notNull().default(true),
     aceptaWhatsapp: boolean("acepta_whatsapp").notNull().default(false),
     aceptaEmail: boolean("acepta_email").notNull().default(false),
     notas: text("notas"),
@@ -198,6 +203,12 @@ export const ordenesTrabajo = pgTable(
     datosSiniestro: jsonb("datos_siniestro").$type<DatosSiniestro>(),
     otOrigenId: uuid("ot_origen_id"),
     cerradaEn: ts("cerrada_en"),
+    /** Anulada por error de alta (no es una entrega): se cierra con motivo */
+    anuladaEn: ts("anulada_en"),
+    motivoAnulacion: text("motivo_anulacion"),
+    /** Último aviso al cliente de que el coche está listo (evita avisar dos veces) */
+    avisadoListoEn: ts("avisado_listo_en"),
+    creadaEn: ts("creada_en").notNull().defaultNow(),
     actualizadaEn: ts("actualizada_en").notNull().defaultNow(),
   },
   (t) => [
@@ -252,6 +263,8 @@ export const entregas = pgTable("entregas", {
   trabajosRealizados: text("trabajos_realizados").notNull(),
   piezasSustituidas: text("piezas_sustituidas"),
   garantiaTexto: text("garantia_texto"),
+  /** El cliente se lleva el coche sin reparar (motivo); null = entrega normal */
+  motivoSinReparar: text("motivo_sin_reparar"),
   documentoId: uuid("documento_id"),
   creadoEn: ts("creado_en").notNull().defaultNow(),
 });

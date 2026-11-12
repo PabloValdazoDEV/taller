@@ -1,10 +1,11 @@
 import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { headers } from "next/headers";
+import { secreto } from "./session-token";
 
 // Enlaces públicos de descarga de documentos: token firmado (imposible de adivinar) con caducidad.
 const DIAS = 30;
-const clave = () => new TextEncoder().encode(process.env.SESSION_SECRET! + ":documentos");
+const clave = () => new TextEncoder().encode(secreto() + ":documentos");
 
 export async function tokenDocumento(docId: string, tallerId: string) {
   return new SignJWT({ d: docId, t: tallerId })

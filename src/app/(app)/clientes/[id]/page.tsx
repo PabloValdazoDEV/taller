@@ -5,6 +5,7 @@ import { requireSesion } from "@/lib/auth";
 import { getCliente } from "@/lib/data";
 import { tallerPorId } from "@/lib/taller";
 import { enlaceDocumento } from "@/lib/enlaces";
+import { telefonoInternacional } from "@/lib/telefono";
 import { enlaceWhatsapp, fmtFecha, fmtFechaHora, fmtKm, TIPO_DOCUMENTO } from "@/lib/formato";
 import { BotonLink, Matricula, Pastilla, Tarjeta, TituloSeccion, Vacio } from "@/components/ui";
 import { LogoMarca } from "@/components/selector-marca-modelo";
@@ -43,10 +44,10 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
             </div>
             <dl className="mt-3 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
               {c.nif && <div><span className="text-slate-500">NIF:</span> <b>{c.nif}</b></div>}
-              {c.telefono && <div className="flex items-center gap-1.5"><Phone className="size-4 text-slate-400" /><a className="underline" href={`tel:${c.telefono}`}>{c.telefono}</a></div>}
+              {c.telefono && <div className="flex items-center gap-1.5"><Phone className="size-4 text-slate-400" /><a className="underline" href={`tel:+${telefonoInternacional(c.telefono)}`}>{c.telefono}</a></div>}
               {c.email && <div className="flex items-center gap-1.5"><Mail className="size-4 text-slate-400" /><a className="underline" href={`mailto:${c.email}`}>{c.email}</a></div>}
               {c.direccion && <div className="flex items-center gap-1.5"><MapPin className="size-4 text-slate-400" />{c.direccion}</div>}
-              <div className="text-slate-500">Avisos: {[c.aceptaWhatsapp && "WhatsApp", c.aceptaEmail && "email"].filter(Boolean).join(" y ") || "solo teléfono"}</div>
+              <div className="text-slate-500">Avisar por: {[c.aceptaLlamada && "llamada", c.aceptaWhatsapp && "WhatsApp", c.aceptaEmail && "email"].filter(Boolean).join(", ") || "no desea avisos"}</div>
               {c.exentoIva && c.motivoExencion && <div className="text-slate-500">Exención: {c.motivoExencion}</div>}
             </dl>
             {c.notas && <p className="mt-3 text-sm rounded-xl bg-amber-50 p-3 whitespace-pre-line">{c.notas}</p>}

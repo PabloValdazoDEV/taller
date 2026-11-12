@@ -1,0 +1,1 @@
+ALTER TABLE "clientes" ADD COLUMN "acepta_llamada" boolean DEFAULT true NOT NULL;

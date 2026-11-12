@@ -44,10 +44,12 @@ PostgreSQL solo está publicado en el `127.0.0.1:5433` del VPS, así que no es a
 
 ```bash
 ssh -N -L 5433:127.0.0.1:5433 usuario@vps &          # túnel
-DATABASE_URL=postgres://taller:<POSTGRES_PASSWORD>@localhost:5433/taller npm run db:seed
+DATABASE_URL=postgres://taller:<POSTGRES_PASSWORD>@localhost:5433/taller DEFAULT_TALLER_SLUG=demo npm run db:seed
 ```
 
 Las fotos y los PDF que se creen durante la demo se guardan en el volumen `storage` del servidor.
+
+> ⚠️ El seed **borra y recrea** el taller indicado. Por seguridad solo actúa sobre talleres creados por él mismo (marcados como demo) y se niega a ejecutarse con `NODE_ENV=production`. Usa siempre un slug de demo (p. ej. `demo` → `demo.tudominio.es`), nunca el del taller real.
 
 ## 4. Plesk: dominio, HTTPS y proxy
 

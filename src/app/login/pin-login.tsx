@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Delete } from "lucide-react";
 import { entrarConPin } from "./actions";
 
-type U = { id: string; nombre: string; rolNombre: string; color: string };
+type U = { id: string; nombre: string; rolNombre: string; color: string; cifras: number };
 
 export function PinLogin({ usuarios }: { usuarios: U[] }) {
   const [sel, setSel] = useState<U | null>(null);
@@ -15,9 +15,10 @@ export function PinLogin({ usuarios }: { usuarios: U[] }) {
   function pulsar(d: string) {
     if (pendiente) return;
     setError("");
-    const nuevo = (pin + d).slice(0, 4);
+    if (!sel) return;
+    const nuevo = (pin + d).slice(0, sel.cifras);
     setPin(nuevo);
-    if (nuevo.length === 4 && sel) {
+    if (nuevo.length === sel.cifras) {
       start(async () => {
         const r = await entrarConPin(sel.id, nuevo);
         if (r?.error) {
@@ -54,7 +55,7 @@ export function PinLogin({ usuarios }: { usuarios: U[] }) {
       </div>
       <div className="font-semibold text-lg">{sel.nombre}</div>
       <div className="flex justify-center gap-3 my-5" aria-label="PIN">
-        {[0, 1, 2, 3].map((i) => (
+        {Array.from({ length: sel.cifras }, (_, i) => i).map((i) => (
           <span key={i} className={`size-4 rounded-full border-2 border-slate-400 ${pin.length > i ? "bg-slate-800 border-slate-800" : ""}`} />
         ))}
       </div>

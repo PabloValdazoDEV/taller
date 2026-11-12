@@ -18,6 +18,7 @@ export async function guardarFotos(
     const ext = TIPOS[f.type];
     if (!ext || f.size > MAX) continue;
     const buf = Buffer.from(await f.arrayBuffer());
+    if (!esImagen(buf, ext)) continue; // el tipo declarado por el navegador no basta: se comprueba la firma del fichero
     const ruta = await guardarFichero(s.tid, "fotos", buf, ext);
     await db.insert(t.archivos).values({
       tallerId: s.tid,
@@ -32,4 +33,12 @@ export async function guardarFotos(
     n++;
   }
   return n;
+}
+
+/** Comprueba los primeros bytes (JPEG FF D8 FF · PNG 89 50 4E 47 · WEBP «RIFF....WEBP»). */
+function esImagen(b: Buffer, ext: string) {
+  if (ext === "jpg") return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  if (ext === "png") return b.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  if (ext === "webp") return b.subarray(0, 4).toString("ascii") === "RIFF" && b.subarray(8, 12).toString("ascii") === "WEBP";
+  return false;
 }

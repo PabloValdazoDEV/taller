@@ -1,7 +1,8 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, t } from "@/db";
+import { diaISO, inicioDia } from "./formato";
 
 /*
  * Capa de lectura. TODAS las consultas reciben el tallerId de la sesión y filtran por él.
@@ -16,9 +17,15 @@ export type TipoConEstados = Awaited<ReturnType<typeof tiposConEstados>>[number]
 
 const mecanico = alias(t.usuarios, "mecanico");
 
-export async function listarOTsAbiertas(tid: string, opts: { mecanicoId?: string } = {}) {
+/** Consulta base de órdenes con todo lo que muestran las tarjetas. */
+function consultaOTs(tid: string, filtro: SQL | undefined) {
   const incAbiertas = db
-    .select({ otId: t.incidencias.otId, n: sql<number>`count(*)::int`.as("n") })
+    .select({
+      otId: t.incidencias.otId,
+      n: sql<number>`count(*)::int`.as("n"),
+      // Averías adicionales pendientes de que el cliente las apruebe (no bloquean, pero se avisan)
+      averias: sql<number>`(count(*) filter (where ${t.incidencias.tipo} = 'averia_adicional'))::int`.as("averias"),
+    })
     .from(t.incidencias)
     .where(and(eq(t.incidencias.tallerId, tid), inArray(t.incidencias.estado, ["abierta", "en_curso"])))
     .groupBy(t.incidencias.otId)
@@ -31,6 +38,9 @@ export async function listarOTsAbiertas(tid: string, opts: { mecanicoId?: string
       trabajo: t.ordenesTrabajo.trabajoSolicitado,
       fechaEntrada: t.ordenesTrabajo.fechaEntrada,
       fechaPrevista: t.ordenesTrabajo.fechaPrevista,
+      cerradaEn: t.ordenesTrabajo.cerradaEn,
+      anuladaEn: t.ordenesTrabajo.anuladaEn,
+      avisadoListoEn: t.ordenesTrabajo.avisadoListoEn,
       actualizadaEn: t.ordenesTrabajo.actualizadaEn,
       datosSiniestro: t.ordenesTrabajo.datosSiniestro,
       tipoId: t.tiposOrden.id,
@@ -41,8 +51,11 @@ export async function listarOTsAbiertas(tid: string, opts: { mecanicoId?: string
       estadoOrden: t.estadosFlujo.orden,
       estadoMarca: t.estadosFlujo.marca,
       requiereAprobacion: t.estadosFlujo.requiereAprobacion,
+      clienteId: t.clientes.id,
       clienteNombre: t.clientes.nombre,
       clienteTelefono: t.clientes.telefono,
+      clienteAceptaWhatsapp: t.clientes.aceptaWhatsapp,
+      clienteAceptaLlamada: t.clientes.aceptaLlamada,
       matricula: t.vehiculos.matricula,
       marca: t.vehiculos.marca,
       modelo: t.vehiculos.modelo,
@@ -50,6 +63,7 @@ export async function listarOTsAbiertas(tid: string, opts: { mecanicoId?: string
       mecanicoNombre: mecanico.nombre,
       mecanicoColor: mecanico.color,
       incidenciasAbiertas: sql<number>`coalesce(${incAbiertas.n}, 0)`,
+      averiasPendientes: sql<number>`coalesce(${incAbiertas.averias}, 0)`,
     })
     .from(t.ordenesTrabajo)
     .innerJoin(t.tiposOrden, eq(t.tiposOrden.id, t.ordenesTrabajo.tipoOrdenId))
@@ -58,15 +72,36 @@ export async function listarOTsAbiertas(tid: string, opts: { mecanicoId?: string
     .innerJoin(t.vehiculos, eq(t.vehiculos.id, t.ordenesTrabajo.vehiculoId))
     .leftJoin(mecanico, eq(mecanico.id, t.ordenesTrabajo.mecanicoId))
     .leftJoin(incAbiertas, eq(incAbiertas.otId, t.ordenesTrabajo.id))
-    .where(
-      and(
-        eq(t.ordenesTrabajo.tallerId, tid),
-        isNull(t.ordenesTrabajo.cerradaEn),
-        opts.mecanicoId ? eq(t.ordenesTrabajo.mecanicoId, opts.mecanicoId) : undefined,
-      ),
-    )
-    .orderBy(asc(t.ordenesTrabajo.fechaPrevista), asc(t.ordenesTrabajo.fechaEntrada));
+    .where(and(eq(t.ordenesTrabajo.tallerId, tid), filtro));
 }
+
+export async function listarOTsAbiertas(tid: string, opts: { mecanicoId?: string } = {}) {
+  return consultaOTs(tid, and(isNull(t.ordenesTrabajo.cerradaEn), opts.mecanicoId ? eq(t.ordenesTrabajo.mecanicoId, opts.mecanicoId) : undefined)).orderBy(
+    asc(t.ordenesTrabajo.fechaPrevista),
+    asc(t.ordenesTrabajo.fechaEntrada),
+  );
+}
+
+/** Condición de búsqueda de órdenes por matrícula, nº de orden, cliente, teléfono o nº de siniestro. */
+function filtroBusquedaOT(q: string) {
+  const texto = q.trim();
+  if (!texto) return undefined;
+  const patron = `%${texto.replace(/[%_]/g, "")}%`;
+  const matr = texto.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const digitos = texto.replace(/\D/g, "");
+  return sql`(${t.ordenesTrabajo.numero} ilike ${patron} or ${t.clientes.nombre} ilike ${patron}
+    ${matr.length >= 2 ? sql`or replace(upper(${t.vehiculos.matricula}), ' ', '') like ${"%" + matr + "%"}` : sql``}
+    ${digitos.length >= 3 ? sql`or regexp_replace(coalesce(${t.clientes.telefono}, ''), '[^0-9]', '', 'g') like ${"%" + digitos + "%"}` : sql``}
+    or (${t.ordenesTrabajo.datosSiniestro}->>'numeroSiniestro') ilike ${patron})`;
+}
+
+/** Búsqueda global: órdenes abiertas y entregadas (las entregadas, más recientes primero). */
+export async function buscarOTs(tid: string, q: string, opts: { cerradas: boolean; limite?: number }) {
+  return consultaOTs(tid, and(opts.cerradas ? isNotNull(t.ordenesTrabajo.cerradaEn) : isNull(t.ordenesTrabajo.cerradaEn), filtroBusquedaOT(q)))
+    .orderBy(opts.cerradas ? desc(t.ordenesTrabajo.cerradaEn) : asc(t.ordenesTrabajo.fechaPrevista))
+    .limit(opts.limite ?? 50);
+}
+
 export type OTResumen = Awaited<ReturnType<typeof listarOTsAbiertas>>[number];
 
 export async function getOT(tid: string, id: string) {
@@ -93,7 +128,7 @@ export async function getOT(tid: string, id: string) {
   if (!ot) return null;
 
   const usuarioH = alias(t.usuarios, "uh");
-  const [estados, historial, recepcion, entrega, incidencias, archivos, documentos, prestamos] = await Promise.all([
+  const [estados, historialEst, asignaciones, recepcion, entrega, incidencias, archivos, documentos, prestamos] = await Promise.all([
     db.select().from(t.estadosFlujo).where(and(eq(t.estadosFlujo.tallerId, tid), eq(t.estadosFlujo.tipoOrdenId, ot.tipo.id))).orderBy(asc(t.estadosFlujo.orden)),
     db
       .select({ id: t.historialEstados.id, fecha: t.historialEstados.fecha, comentario: t.historialEstados.comentario, estado: t.estadosFlujo.nombre, usuario: usuarioH.nombre })
@@ -102,6 +137,12 @@ export async function getOT(tid: string, id: string) {
       .leftJoin(usuarioH, eq(usuarioH.id, t.historialEstados.usuarioId))
       .where(and(eq(t.historialEstados.tallerId, tid), eq(t.historialEstados.otId, id)))
       .orderBy(desc(t.historialEstados.fecha)),
+    // Cambios de mecánico (se registran en auditoría) para mostrarlos en el historial
+    db
+      .select({ id: t.auditoria.id, fecha: t.auditoria.fecha, datos: t.auditoria.datos, usuario: usuarioH.nombre })
+      .from(t.auditoria)
+      .leftJoin(usuarioH, eq(usuarioH.id, t.auditoria.usuarioId))
+      .where(and(eq(t.auditoria.tallerId, tid), eq(t.auditoria.entidad, "ot"), eq(t.auditoria.entidadId, id), eq(t.auditoria.accion, "asignar_mecanico"))),
     db.query.recepciones.findFirst({ where: and(eq(t.recepciones.tallerId, tid), eq(t.recepciones.otId, id)) }),
     db.query.entregas.findFirst({ where: and(eq(t.entregas.tallerId, tid), eq(t.entregas.otId, id)) }),
     db
@@ -120,6 +161,13 @@ export async function getOT(tid: string, id: string) {
       .orderBy(desc(t.prestamos.salidaEn)),
   ]);
 
+  const historial = [
+    ...historialEst.map((h) => ({ ...h, tipo: "estado" as const })),
+    ...asignaciones.map((a) => {
+      const nombre = (a.datos as { nombre?: string | null } | null)?.nombre;
+      return { id: a.id, fecha: a.fecha, usuario: a.usuario, comentario: null, estado: nombre ? `Asignado a ${nombre}` : "Sin mecánico asignado", tipo: "mecanico" as const };
+    }),
+  ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
   return { ...ot, estados, historial, recepcion, entrega, incidencias, archivos, documentos, prestamos };
 }
 export type OTDetalle = NonNullable<Awaited<ReturnType<typeof getOT>>>;
@@ -140,11 +188,10 @@ export async function compania(tid: string) {
     .orderBy(asc(t.clientes.nombre));
 }
 
-export async function citasDelDia(tid: string, dia = new Date()) {
-  const ini = new Date(dia);
-  ini.setHours(0, 0, 0, 0);
-  const fin = new Date(ini);
-  fin.setDate(fin.getDate() + 1);
+export async function citasDelDia(tid: string, dia = diaISO()) {
+  // Límites del día en hora de Madrid (el servidor puede estar en UTC)
+  const ini = inicioDia(dia);
+  const fin = inicioDia(diaISO(new Date(ini.getTime() + 36 * 3_600_000)));
   return db
     .select({ c: t.citas, tipoNombre: t.tiposOrden.nombre, tipoColor: t.tiposOrden.color })
     .from(t.citas)
@@ -189,11 +236,13 @@ export async function listarClientes(tid: string, q: string, tipo: FiltroTipoCli
   const texto = q.trim();
   const patron = `%${texto.replace(/[%_]/g, "")}%`;
   const matr = texto.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const digitos = texto.replace(/\D/g, "");
   const filtroTipo =
     tipo === "companias" ? inArray(t.clientes.tipo, ["aseguradora", "flota"]) : tipo === "todos" ? undefined : eq(t.clientes.tipo, tipo);
 
   const busqueda = texto
     ? sql`(${t.clientes.nombre} ilike ${patron} or ${t.clientes.nif} ilike ${patron} or ${t.clientes.telefono} ilike ${patron}
+          ${digitos.length >= 3 ? sql`or regexp_replace(coalesce(${t.clientes.telefono}, ''), '[^0-9]', '', 'g') like ${"%" + digitos + "%"}` : sql``}
           or ${t.clientes.email} ilike ${patron}
           or exists (select 1 from vehiculos v where v.cliente_id = ${CLIENTE_ID} and replace(upper(v.matricula), ' ', '') like ${"%" + matr + "%"}))`
     : undefined;

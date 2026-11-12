@@ -7,7 +7,8 @@ import { Boton, Campo, Input, Tarjeta, Textarea, cx } from "@/components/ui";
 import { SiluetaDanos } from "@/components/silueta-danos";
 import { SelectorCombustible } from "@/components/combustible";
 import { PanelFirma } from "@/components/firma";
-import { aniosDesde } from "@/lib/formato";
+import { KmInput } from "@/components/km-input";
+import { aniosDesde, fmtKm, fmtMiles } from "@/lib/formato";
 import { crearPrestamo, devolverPrestamo } from "./actions";
 
 type Coche = { id: string; matricula: string; marca: string; modelo: string; km: number; combustible: number };
@@ -65,7 +66,7 @@ export function FormularioPrestamo(p: {
             >
               <div className="font-mono font-bold">{c.matricula}</div>
               <div className="text-sm">{c.marca} {c.modelo}</div>
-              <div className="text-xs text-slate-500">{c.km.toLocaleString("es-ES")} km</div>
+              <div className="text-xs text-slate-500">{fmtKm(c.km)}</div>
             </button>
           ))}
         </div>
@@ -76,7 +77,7 @@ export function FormularioPrestamo(p: {
           <Campo etiqueta="Conductor"><Input value={d.conductorNombre} onChange={(e) => set("conductorNombre", e.target.value)} /></Campo>
           <Campo etiqueta="DNI / NIE"><Input value={d.conductorDni} onChange={(e) => set("conductorDni", e.target.value.toUpperCase())} /></Campo>
           <Campo etiqueta="Fecha de nacimiento"><Input type="date" value={d.conductorNacimiento} onChange={(e) => set("conductorNacimiento", e.target.value)} /></Campo>
-          <Campo etiqueta="Fecha de expedición del carnet"><Input type="date" value={d.carnetFecha} onChange={(e) => set("carnetFecha", e.target.value)} /></Campo>
+          <Campo etiqueta="Fecha en que se sacó el carnet de conducir"><Input type="date" value={d.carnetFecha} onChange={(e) => set("carnetFecha", e.target.value)} /></Campo>
         </div>
         {comprobado && (
           <div className={cx("rounded-xl p-3 text-sm flex gap-2", cumple ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900")}>
@@ -109,7 +110,7 @@ export function FormularioPrestamo(p: {
 
       <Tarjeta className="p-4 md:p-6 space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Campo etiqueta="Km a la salida"><Input inputMode="numeric" value={d.kmSalida} onChange={(e) => set("kmSalida", e.target.value.replace(/\D/g, ""))} /></Campo>
+          <Campo etiqueta="Km a la salida"><KmInput value={d.kmSalida} onChange={(v) => set("kmSalida", v)} /></Campo>
           <div><span className="block text-sm font-medium text-slate-700 mb-1">Combustible</span><SelectorCombustible value={d.combSalida} onChange={(v) => set("combSalida", v)} /></div>
         </div>
         <span className="block text-sm font-medium text-slate-700">Daños existentes en el coche de sustitución</span>
@@ -156,8 +157,8 @@ export function FormularioDevolucion(p: { prestamoId: string; kmSalida: number; 
     <div className="space-y-5">
       <Tarjeta className="p-4 md:p-6 space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Campo etiqueta="Km a la llegada" ayuda={`Salida: ${p.kmSalida.toLocaleString("es-ES")} km${km ? ` · recorridos: ${(Number(km) - p.kmSalida).toLocaleString("es-ES")}` : ""}`}>
-            <Input inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value.replace(/\D/g, ""))} />
+          <Campo etiqueta="Km a la llegada" ayuda={`Salida: ${fmtKm(p.kmSalida)}${km ? ` · recorridos: ${fmtMiles(Number(km) - p.kmSalida)}` : ""}`}>
+            <KmInput value={km} onChange={setKm} />
           </Campo>
           <div>
             <span className="block text-sm font-medium text-slate-700 mb-1">Combustible {comb != null && comb < p.combSalida && <span className="text-amber-700">(menos que a la salida)</span>}</span>

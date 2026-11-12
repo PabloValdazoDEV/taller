@@ -30,6 +30,17 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 async function main() {
   const previo = await db.query.talleres.findFirst({ where: eq(t.talleres.slug, SLUG) });
+  // Protección: este script BORRA el taller. Solo se permite sobre un taller de demo creado por él mismo.
+  if (previo && !previo.config?.demo && process.env.SEED_FORZAR !== "1") {
+    console.error(`✖ El taller «${SLUG}» no es de demo (tiene datos reales). No se borra nada.`);
+    console.error("  Para la demo usa otro slug: DEFAULT_TALLER_SLUG=demo npm run db:seed");
+    console.error("  (Si es una demo antigua creada antes de esta protección: SEED_FORZAR=1 npm run db:seed)");
+    process.exit(1);
+  }
+  if (process.env.NODE_ENV === "production" && process.env.SEED_FORZAR !== "1") {
+    console.error("✖ NODE_ENV=production: el seed de demo está bloqueado (SEED_FORZAR=1 para un servidor de demo).");
+    process.exit(1);
+  }
   if (previo) {
     await borrarTaller(previo.id);
     // Fotos y PDF del taller anterior
@@ -48,16 +59,16 @@ async function main() {
       whatsapp: "680 77 29 49",
       email: "talleresvalrodri@hotmail.com",
       colorPrimario: "#c2410c",
-      config: TEXTOS_LEGALES_BASE,
+      config: { ...TEXTOS_LEGALES_BASE, demo: true, horario: "L-V 8:30-14:00 y 15:00-18:00" },
     })
     .returning();
   const tid = taller.id;
 
   // Usuarios (PIN entre paréntesis — solo demo)
   const usuariosDef = [
-    { nombre: "Pablo", rol: "admin", pin: "1234", color: "#0f172a" },
+    { nombre: "Pablo", rol: "admin", pin: "123456", color: "#0f172a" },
     { nombre: "Laura", rol: "asesor", pin: "1111", color: "#c2410c" },
-    { nombre: "Javier", rol: "jefe_taller", pin: "2222", color: "#1d4ed8" },
+    { nombre: "Javier", rol: "jefe_taller", pin: "222222", color: "#1d4ed8" },
     { nombre: "Rubén", rol: "mecanico", pin: "3333", color: "#15803d" },
     { nombre: "Sergio", rol: "mecanico", pin: "4444", color: "#7c3aed" },
     { nombre: "Iván (chapa)", rol: "mecanico", pin: "5555", color: "#b45309" },
@@ -244,7 +255,7 @@ async function main() {
 
   void inArray; void otraAseg;
   console.log(`✔ Taller demo "${taller.nombre}" (${SLUG}) creado con ${ots.length} órdenes.`);
-  console.log("  PINs: Pablo 1234 · Laura 1111 · Javier 2222 · Rubén 3333 · Sergio 4444 · Iván 5555 · Marta 6666");
+  console.log("  PINs: Pablo 123456 · Laura 1111 · Javier 222222 · Rubén 3333 · Sergio 4444 · Iván 5555 · Marta 6666");
   process.exit(0);
 }
 

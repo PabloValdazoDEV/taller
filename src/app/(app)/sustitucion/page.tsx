@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireSesion } from "@/lib/auth";
 import { flotaSustitucion } from "@/lib/data";
-import { fmtCombustible, fmtFecha, fmtFechaHora, fmtKm } from "@/lib/formato";
+import { BotonMantenimiento } from "./mantenimiento";
+import { diaISO, diasDesde, fmtCombustible, fmtFecha, fmtFechaHora, fmtKm } from "@/lib/formato";
 import { BotonLink, Matricula, Pastilla, Tarjeta } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ const ESTADO = { disponible: ["Disponible", "#059669"], prestado: ["Prestado", "
 export default async function Flota() {
   const s = await requireSesion(["admin", "asesor", "jefe_taller"]);
   const flota = await flotaSustitucion(s.tid);
-  const en30 = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
+  const en30 = diaISO(new Date(Date.now() + 30 * 86400_000));
 
   return (
     <div className="space-y-4">
@@ -37,13 +38,14 @@ export default async function Flota() {
                   <div>
                     <div className="font-semibold">{c.prestamo.p.conductorNombre}</div>
                     <div className="text-xs text-slate-600">
-                      Desde {fmtFechaHora(c.prestamo.p.salidaEn)}
+                      Desde {fmtFechaHora(c.prestamo.p.salidaEn)} · <b className={diasDesde(c.prestamo.p.salidaEn) >= 15 ? "text-red-700" : ""}>{diasDesde(c.prestamo.p.salidaEn)} día(s)</b>
                       {c.prestamo.otId && <> · <Link className="underline" href={`/ot/${c.prestamo.otId}`}>Orden {c.prestamo.otNumero}</Link></>}
                     </div>
                   </div>
-                  <BotonLink variante="secundario" className="min-h-9" href={`/sustitucion/${c.prestamo.p.id}/devolucion`}>Devolución</BotonLink>
+                  <BotonLink variante="secundario" className="min-h-10" href={`/sustitucion/${c.prestamo.p.id}/devolucion`}>Devolución</BotonLink>
                 </div>
               )}
+              {c.estado !== "prestado" && <BotonMantenimiento cocheId={c.id} enMantenimiento={c.estado === "mantenimiento"} />}
             </Tarjeta>
           );
         })}

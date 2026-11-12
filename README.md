@@ -26,9 +26,9 @@ Para probarlo en una tablet o un móvil de la misma red Wi-Fi, abre `http://<IP-
 
 | Usuario | Rol | PIN |
 |---|---|---|
-| Pablo | Administración | 1234 |
+| Pablo | Administración | 123456 |
 | Laura | Recepción | 1111 |
-| Javier | Jefe de taller | 2222 |
+| Javier | Jefe de taller | 222222 |
 | Rubén / Sergio | Mecánicos | 3333 / 4444 |
 | Iván (chapa) / Marta (pintura) | Mecánicos | 5555 / 6666 |
 

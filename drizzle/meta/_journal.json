@@ -15,6 +15,27 @@
       "when": 1794345407235,
       "tag": "0001_catalogo_vehiculos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794429228782,
+      "tag": "0002_avisos_llamada",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794433207146,
+      "tag": "0003_ot_aviso_creada",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794444766647,
+      "tag": "0004_anular_sin_reparar",
+      "breakpoints": true
     }
   ]
 }

@@ -5,13 +5,18 @@ export type Rol = "admin" | "asesor" | "jefe_taller" | "mecanico";
 export type Sesion = { uid: string; tid: string; slug: string; rol: Rol; nombre: string };
 
 export const COOKIE_SESION = "taller_sesion";
+
+/** Cifras del PIN según el rol: las cuentas con más permisos llevan un PIN más largo. */
+export const longitudPin = (rol: Rol) => (rol === "admin" || rol === "jefe_taller" ? 6 : 4);
 const DURACION_H = 12;
 
-function clave() {
+/** Secreto de la app comprobado (nunca se firma nada con un secreto vacío o corto). */
+export function secreto() {
   const s = process.env.SESSION_SECRET;
   if (!s || s.length < 32) throw new Error("SESSION_SECRET no definido o demasiado corto (mín. 32)");
-  return new TextEncoder().encode(s);
+  return s;
 }
+const clave = () => new TextEncoder().encode(secreto());
 
 export async function firmarSesion(s: Sesion) {
   return new SignJWT(s)

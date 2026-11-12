@@ -2,7 +2,7 @@ import { Document, Page, View, Text, Image, StyleSheet, Svg, Path, Rect, Circle,
 import type { ReactNode } from "react";
 import type { Dano, DatosSiniestro } from "@/db/schema";
 import { ESTILOS, VISTAS, vistaDe, zonaDano, type DefVista, type Forma } from "@/lib/silueta";
-import { fmtCombustible, fmtFecha, fmtFechaHora, fmtKm } from "@/lib/formato";
+import { fmtCombustible, fmtFecha, fmtFechaHora, fmtKm, fmtMiles } from "@/lib/formato";
 
 const C = { texto: "#0f172a", suave: "#64748b", borde: "#cbd5e1", fondo: "#f1f5f9" };
 
@@ -209,6 +209,7 @@ export type DatosResguardo = {
   danos: Dano[];
   observaciones: string | null;
   trabajoSolicitado: string;
+  fechaEntrada: Date;
   fechaPrevista: string | null;
   renunciaPresupuesto: boolean;
   siniestro?: DatosSiniestro | null;
@@ -225,7 +226,7 @@ export function ResguardoPdf(d: DatosResguardo) {
       <Seccion titulo="Trabajo solicitado">
         <View style={st.caja}><Text>{d.trabajoSolicitado}</Text></View>
         <View style={[st.fila, { marginTop: 4 }]}>
-          <View style={st.col}><Dato et="Entrega prevista" val={fmtFecha(d.fechaPrevista)} /></View>
+          <View style={st.col}><Dato et="Recepción" val={fmtFechaHora(d.fechaEntrada)} /><Dato et="Entrega prevista" val={fmtFecha(d.fechaPrevista)} /></View>
           <View style={st.col}><Dato et="Presupuesto" val={d.renunciaPresupuesto ? "El cliente RENUNCIA expresamente a presupuesto previo" : "Se facilitará presupuesto antes de reparar"} /></View>
         </View>
       </Seccion>
@@ -254,6 +255,8 @@ export function ResguardoPdf(d: DatosResguardo) {
 // ───────────────────────── Acta de entrega ─────────────────────────
 
 export type DatosEntrega = {
+  /** Motivo si el cliente se lleva el vehículo sin reparar */
+  sinReparar?: string | null;
   taller: TallerPdf;
   evidencia: Evidencia;
   numeroOT: string;
@@ -277,8 +280,18 @@ export type DatosEntrega = {
 
 export function EntregaPdf(d: DatosEntrega) {
   return (
-    <Marco taller={d.taller} titulo="ACTA DE ENTREGA" subtitulo={`Orden ${d.numeroOT} · ${d.tipoOrden}`} evidencia={d.evidencia}>
+    <Marco taller={d.taller} titulo={d.sinReparar ? "ACTA DE RETIRADA SIN REPARAR" : "ACTA DE ENTREGA"} subtitulo={`Orden ${d.numeroOT} · ${d.tipoOrden}`} evidencia={d.evidencia}>
       <ClienteVehiculo cliente={d.cliente} vehiculo={d.vehiculo} />
+      {d.sinReparar && (
+        <View style={{ borderWidth: 1.5, borderColor: "#b91c1c", borderRadius: 3, padding: 6, marginBottom: 8 }}>
+          <Text style={{ fontFamily: "Helvetica-Bold", color: "#b91c1c" }}>EL CLIENTE RETIRA EL VEHÍCULO SIN REPARAR</Text>
+          <Text>Motivo: {d.sinReparar}</Text>
+          <Text style={[st.suave, { fontSize: 7 }]}>
+            El cliente declara conocer el estado del vehículo y que no se han realizado los trabajos solicitados (salvo los indicados abajo). El taller no responde de
+            las averías o daños pendientes de reparar.
+          </Text>
+        </View>
+      )}
       <Seccion titulo="Estancia en taller">
         <View style={st.fila}>
           <View style={st.col}><Dato et="Entrada" val={fmtFechaHora(d.fechaEntrada)} /><Dato et="Km entrada" val={fmtKm(d.kmEntrada)} /></View>
@@ -319,9 +332,9 @@ export function EntregaPdf(d: DatosEntrega) {
           {d.totalFotosDespues > d.fotosDespues.length && <Text style={st.suave}>+{d.totalFotosDespues - d.fotosDespues.length} fotografías más archivadas en la orden.</Text>}
         </Seccion>
       )}
-      <Seccion titulo="Garantía"><Text>{d.garantia}</Text></Seccion>
+      {!d.sinReparar && d.garantia && <Seccion titulo="Garantía"><Text>{d.garantia}</Text></Seccion>}
       <Text style={st.legal}>{d.textoLegal}</Text>
-      <Firmas firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} etiquetaCliente="Recibí conforme (cliente)" />
+      <Firmas firmaPng={d.firmaPng} firmante={d.evidencia.firmante} empleado={d.evidencia.atendidoPor} etiquetaCliente={d.sinReparar ? "Retiro el vehículo sin reparar (cliente)" : "Recibí conforme (cliente)"} />
     </Marco>
   );
 }
@@ -380,7 +393,7 @@ export function PrestamoPdf(d: DatosPrestamo) {
       {devol && (
         <Seccion titulo="Estado a la devolución">
           <View style={st.fila}>
-            <View style={st.col}><Dato et="Kilómetros" val={`${fmtKm(d.kmLlegada)} (${((d.kmLlegada ?? 0) - d.kmSalida).toLocaleString("es-ES")} recorridos)`} /></View>
+            <View style={st.col}><Dato et="Kilómetros" val={`${fmtKm(d.kmLlegada)} (${fmtMiles((d.kmLlegada ?? 0) - d.kmSalida)} recorridos)`} /></View>
             <View style={st.col}><Dato et="Combustible" val={fmtCombustible(d.combLlegada)} /></View>
           </View>
           <SiluetaPdf danos={d.danosLlegada ?? []} />

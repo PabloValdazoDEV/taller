@@ -20,7 +20,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     accion: "descarga_publica",
     entidad: "documento",
     entidadId: d.id,
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    ip: req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ?? null,
     userAgent: req.headers.get("user-agent"),
   });
 
@@ -28,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${encodeURIComponent(nombre)}"`,
+      "Content-Disposition": `inline; filename="${nombre.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(nombre)}`,
       "Cache-Control": "private, no-store",
       "X-Robots-Tag": "noindex",
     },

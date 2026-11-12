@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import Link from "next/link";
+import { LogOut, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { Navegacion } from "./navegacion";
 import { cx } from "./ui";
 import { salir } from "@/app/login/actions";
@@ -37,6 +38,24 @@ export function BarraLateral({ taller, nombre, rolNombre, rol, plegadaInicial }:
           {plegada ? <PanelLeftOpen className="size-5" /> : <PanelLeftClose className="size-5" />}
         </button>
       </div>
+      {rol !== "mecanico" &&
+        (plegada ? (
+          <Link href="/buscar" className="mx-3 mt-3 flex justify-center rounded-xl py-2.5 text-slate-300 hover:bg-white/5" aria-label="Buscar" title="Buscar (matrícula, cliente, nº de orden…)">
+            <Search className="size-5" />
+          </Link>
+        ) : (
+          <form action="/buscar" className="px-3 pt-3" role="search">
+            <div className="relative">
+              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                name="q"
+                placeholder="Matrícula, cliente, nº…"
+                aria-label="Buscar matrícula, cliente o nº de orden"
+                className="w-full min-h-10 rounded-xl bg-white/10 border border-white/10 pl-9 pr-3 text-sm text-white placeholder:text-slate-400 focus:bg-white/15 focus:outline-none focus:border-white/30"
+              />
+            </div>
+          </form>
+        ))}
       <Navegacion rol={rol} variante="lateral" plegada={plegada} />
       <div className={cx("mt-auto p-4 border-t border-white/10 flex items-center", plegada ? "justify-center" : "justify-between")}>
         {!plegada && (

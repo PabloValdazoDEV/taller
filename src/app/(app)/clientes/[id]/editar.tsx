@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { Loader2, Pencil } from "lucide-react";
 import { Boton, Campo, Input, Select, Textarea } from "@/components/ui";
+import { TelefonoInput } from "@/components/telefono-input";
 import { actualizarCliente } from "../actions";
 
 type Cliente = {
   id: string; tipo: string; nombre: string; nif: string | null; telefono: string | null; email: string | null; direccion: string | null;
-  notas: string | null; aceptaWhatsapp: boolean; aceptaEmail: boolean; exentoIva: boolean; motivoExencion: string | null;
+  notas: string | null; aceptaLlamada: boolean; aceptaWhatsapp: boolean; aceptaEmail: boolean; exentoIva: boolean; motivoExencion: string | null;
 };
 
 export function EditarCliente({ c }: { c: Cliente }) {
@@ -47,13 +48,14 @@ export function EditarCliente({ c }: { c: Cliente }) {
           <option value="flota">Renting / flota</option>
         </Select>
       </Campo>
+      <Campo etiqueta="Teléfono" className="sm:col-span-2 lg:col-span-1"><TelefonoInput name="telefono" defaultValue={c.telefono} /></Campo>
       <Campo etiqueta="NIF / DNI"><Input name="nif" defaultValue={c.nif ?? ""} /></Campo>
-      <Campo etiqueta="Teléfono"><Input name="telefono" type="tel" defaultValue={c.telefono ?? ""} /></Campo>
       <Campo etiqueta="Email"><Input name="email" type="email" defaultValue={c.email ?? ""} /></Campo>
       <Campo etiqueta="Dirección" className="sm:col-span-2"><Input name="direccion" defaultValue={c.direccion ?? ""} /></Campo>
       <div className="sm:col-span-2 flex flex-wrap gap-4 text-sm">
-        <label className="flex items-center gap-2"><input type="checkbox" name="aceptaWhatsapp" defaultChecked={c.aceptaWhatsapp} className="size-5" /> Acepta WhatsApp</label>
-        <label className="flex items-center gap-2"><input type="checkbox" name="aceptaEmail" defaultChecked={c.aceptaEmail} className="size-5" /> Acepta email</label>
+        <label className="flex items-center gap-2"><input type="checkbox" name="aceptaLlamada" defaultChecked={c.aceptaLlamada} className="size-5" /> Avisar por llamada</label>
+        <label className="flex items-center gap-2"><input type="checkbox" name="aceptaWhatsapp" defaultChecked={c.aceptaWhatsapp} className="size-5" /> Avisar por WhatsApp</label>
+        <label className="flex items-center gap-2"><input type="checkbox" name="aceptaEmail" defaultChecked={c.aceptaEmail} className="size-5" /> Avisar por email</label>
         <label className="flex items-center gap-2"><input type="checkbox" name="exentoIva" checked={exento} onChange={(e) => setExento(e.target.checked)} className="size-5" /> Exento de IVA</label>
       </div>
       {exento && <Campo etiqueta="Motivo legal de la exención" className="sm:col-span-2"><Input name="motivoExencion" defaultValue={c.motivoExencion ?? ""} placeholder="Ej.: Art. 20.Uno… Ley 37/1992" /></Campo>}

@@ -1,3 +1,4 @@
+import { longitudPin } from "@/lib/session-token";
 import { and, asc, eq } from "drizzle-orm";
 import { db, t } from "@/db";
 import { tallerActual } from "@/lib/taller";
@@ -25,7 +26,7 @@ export default async function LoginPage() {
           <h1 className="text-2xl font-bold">{taller.nombre}</h1>
           <p className="text-slate-500">¿Quién eres?</p>
         </div>
-        <PinLogin usuarios={usuarios.map((u) => ({ ...u, rolNombre: NOMBRE_ROL[u.rol] }))} />
+        <PinLogin usuarios={usuarios.map((u) => ({ id: u.id, nombre: u.nombre, color: u.color, rolNombre: NOMBRE_ROL[u.rol], cifras: longitudPin(u.rol) }))} />
       </div>
     </main>
   );

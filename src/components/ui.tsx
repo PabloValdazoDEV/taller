@@ -82,7 +82,7 @@ export function Matricula({ children, grande }: { children: ReactNode; grande?: 
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-md border-2 border-slate-800 bg-white font-mono font-bold tracking-wider text-slate-900",
+        "inline-flex items-center whitespace-nowrap shrink-0 rounded-md border-2 border-slate-800 bg-white font-mono font-bold tracking-wider text-slate-900",
         grande ? "px-3 py-1 text-xl" : "px-1.5 text-xs",
       )}
     >

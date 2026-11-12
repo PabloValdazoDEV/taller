@@ -2,16 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, Car, CheckCircle2, FileText, History, Image as ImageIcon, MessageCircle, ShieldCheck, Wrench } from "lucide-react";
 import { requireSesion } from "@/lib/auth";
-import { getOT, mecanicos as listarMecanicos } from "@/lib/data";
+import { compania as listarCompanias, getOT, mecanicos as listarMecanicos } from "@/lib/data";
 import { tallerPorId } from "@/lib/taller";
 import { BotonLink, Matricula, Pastilla, Tarjeta, TituloSeccion, Vacio, cx } from "@/components/ui";
 import { VistasDanos } from "@/components/silueta-danos";
 import { LogoMarca } from "@/components/selector-marca-modelo";
 import { zonaDano } from "@/lib/silueta";
+import { telefonoInternacional } from "@/lib/telefono";
+import { mensajeListo } from "@/lib/mensajes";
 import { enlaceWhatsapp, fmtCombustible, fmtFecha, fmtFechaHora, fmtKm, TIPO_DOCUMENTO, TIPO_INCIDENCIA } from "@/lib/formato";
 import { CompartirDocumento } from "@/components/compartir-documento";
 import { enlaceDocumento } from "@/lib/enlaces";
-import { AsignarMecanico, FlujoEstados, NuevaIncidencia, ResolverIncidencia, SubirFotos } from "./controles";
+import { AnularOT, AsignarMecanico, EditarDatosOT, FlujoEstados, NuevaIncidencia, ResolverIncidencia, SubirFotos } from "./controles";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,7 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
   const sp = await searchParams;
   const ot = await getOT(s.tid, id);
   if (!ot) notFound();
-  const [mecs, taller] = await Promise.all([listarMecanicos(s.tid), tallerPorId(s.tid)]);
+  const [mecs, taller, companias] = await Promise.all([listarMecanicos(s.tid), tallerPorId(s.tid), listarCompanias(s.tid)]);
 
   const esOficina = s.rol !== "mecanico";
   const cerrada = !!ot.ot.cerradaEn;
@@ -44,13 +46,14 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
     mensaje: mensajeDoc(d.tipo),
     nombreFichero: ficheroDoc(d.tipo),
   });
+  const averiasPendientes = ot.incidencias.filter(({ i }) => i.tipo === "averia_adicional" && (i.estado === "abierta" || i.estado === "en_curso"));
   const fotosAntes = ot.archivos.filter((a) => a.entidad === "recepcion");
   const fotosDespues = ot.archivos.filter((a) => a.entidad === "entrega");
   const fotosDurante = ot.archivos.filter((a) => a.entidad !== "recepcion" && a.entidad !== "entrega");
   const wa = enlaceWhatsapp(
     ot.cliente.telefono,
     listo
-      ? `Hola ${ot.cliente.nombre.split(" ")[0]}, le escribimos de ${taller.nombre}. Su ${ot.vehiculo.marca ?? "vehículo"} ${ot.vehiculo.modelo ?? ""} (${ot.vehiculo.matricula}) ya está listo para recoger. ¡Gracias!`
+      ? mensajeListo(taller, { clienteNombre: ot.cliente.nombre, marca: ot.vehiculo.marca, modelo: ot.vehiculo.modelo, matricula: ot.vehiculo.matricula })
       : `Hola ${ot.cliente.nombre.split(" ")[0]}, le escribimos de ${taller.nombre} sobre su vehículo ${ot.vehiculo.matricula} (orden ${ot.ot.numero}). Estado actual: ${ot.estado.nombre}.`,
   );
 
@@ -86,6 +89,28 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
         </div>
       )}
 
+      {ot.ot.anuladaEn && (
+        <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-red-900">
+          <div className="font-bold">Orden ANULADA el {fmtFechaHora(ot.ot.anuladaEn)}</div>
+          <div className="text-sm">Motivo: {ot.ot.motivoAnulacion}</div>
+        </div>
+      )}
+      {ot.entrega?.motivoSinReparar && (
+        <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-red-900">
+          <div className="font-bold">Retirado SIN REPARAR</div>
+          <div className="text-sm">Motivo: {ot.entrega.motivoSinReparar}</div>
+        </div>
+      )}
+      {!cerrada && averiasPendientes.length > 0 && (
+        <div className="rounded-2xl bg-red-50 border border-red-200 p-4 flex items-start gap-3 text-red-900">
+          <AlertTriangle className="size-5 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <b>Avería adicional pendiente de aprobación del cliente</b>
+            {esOficina ? " — llámale y marca la incidencia como resuelta (aprobada) o descartada." : " — la oficina lo está gestionando."} Se puede seguir con el trabajo ya aprobado.
+          </div>
+        </div>
+      )}
+
       {/* Cabecera */}
       <Tarjeta className="p-4 md:p-5" style={{ borderTop: `4px solid ${ot.tipo.color}` }}>
         <div className="flex flex-wrap items-start gap-4">
@@ -98,7 +123,7 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
             <h1 className="text-xl font-bold mt-2 flex items-center gap-2 flex-wrap">{ot.vehiculo.marca && <LogoMarca marca={ot.vehiculo.marca} className="size-8" />}{ot.vehiculo.marca} {ot.vehiculo.modelo} <span className="text-slate-400 font-normal text-base">{ot.vehiculo.color}</span></h1>
             <div className="text-sm text-slate-600">
               {ot.cliente.nombre}
-              {ot.cliente.telefono && <> · <a className="underline" href={`tel:${ot.cliente.telefono}`}>{ot.cliente.telefono}</a></>}
+              {ot.cliente.telefono && <> · <a className="underline" href={`tel:+${telefonoInternacional(ot.cliente.telefono)}`}>{ot.cliente.telefono}</a></>}
               {ot.cliente.exentoIva && <Pastilla color="#0369a1" className="ml-2">Exento IVA</Pastilla>}
             </div>
             <div className="text-xs text-slate-500 mt-1">
@@ -115,6 +140,10 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
               <BotonLink variante="secundario" href={`/ot/${ot.ot.id}/prestamo`}><Car className="size-4" /> Coche sustitución</BotonLink>
             )}
             {esOficina && listo && !cerrada && <BotonLink variante="exito" href={`/ot/${ot.ot.id}/entrega`}>Entregar vehículo</BotonLink>}
+            {esOficina && !listo && !cerrada && (
+              <BotonLink variante="secundario" href={`/ot/${ot.ot.id}/entrega?sinReparar=1`}>Retira sin reparar</BotonLink>
+            )}
+            {s.rol === "admin" && !cerrada && <AnularOT otId={ot.ot.id} />}
           </div>
         </div>
 
@@ -128,6 +157,8 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
               color={ot.tipo.color}
               puedeElegir={esOficina}
               cerrada={cerrada || (s.rol === "mecanico" && ot.ot.mecanicoId !== s.uid)}
+              mecanicos={mecs}
+              mecanicoId={ot.ot.mecanicoId}
             />
           </div>
           <div>
@@ -144,7 +175,21 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
           <Tarjeta className="p-4">
-            <TituloSeccion><span className="inline-flex items-center gap-2"><Wrench className="size-4" /> Trabajo solicitado</span></TituloSeccion>
+            <TituloSeccion
+              accion={
+                esOficina &&
+                !cerrada && (
+                  <EditarDatosOT
+                    otId={ot.ot.id}
+                    datos={{ trabajo: ot.ot.trabajoSolicitado, fechaPrevista: ot.ot.fechaPrevista, siniestro: sin }}
+                    conSiniestro={ot.tipo.requiereSiniestro}
+                    companias={companias}
+                  />
+                )
+              }
+            >
+              <span className="inline-flex items-center gap-2"><Wrench className="size-4" /> Trabajo solicitado</span>
+            </TituloSeccion>
             <p className="text-sm whitespace-pre-line">{ot.ot.trabajoSolicitado}</p>
             {ot.entrega && (
               <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm">
@@ -162,6 +207,7 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
                 <Dato t="Nº siniestro / autoriz." v={sin.numeroSiniestro} />
                 <Dato t="Póliza / contrato" v={sin.numeroPoliza} />
                 <Dato t="Perito" v={sin.perito} />
+                <Dato t="Peritaje" v={sin.fechaPeritaje ? fmtFecha(sin.fechaPeritaje) : null} />
                 <Dato t="Franquicia" v={sin.franquicia != null ? `${sin.franquicia} €` : null} />
                 <Dato t="Coche sustitución" v={sin.cubreSustitucion ? "Cubierto" : "No cubierto"} />
               </dl>
@@ -169,7 +215,7 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
           )}
 
           <Tarjeta className="p-4">
-            <TituloSeccion accion={!cerrada && <NuevaIncidencia otId={ot.ot.id} />}>
+            <TituloSeccion accion={!cerrada && <NuevaIncidencia otId={ot.ot.id} esOficina={esOficina} />}>
               <span className="inline-flex items-center gap-2"><AlertTriangle className="size-4" /> Incidencias</span>
             </TituloSeccion>
             {ot.incidencias.length === 0 && <Vacio>Sin incidencias.</Vacio>}
@@ -286,7 +332,7 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
             <ol className="relative border-l-2 border-slate-200 ml-1.5 space-y-3">
               {ot.historial.map((h) => (
                 <li key={h.id} className="pl-4 relative">
-                  <span className="absolute -left-[7px] top-1 size-3 rounded-full bg-slate-400" />
+                  <span className={`absolute -left-[7px] top-1 size-3 rounded-full ${h.tipo === "mecanico" ? "bg-sky-400" : "bg-slate-400"}`} />
                   <div className="text-sm font-medium">{h.estado}</div>
                   <div className="text-xs text-slate-500">{fmtFechaHora(h.fecha)} · {h.usuario ?? "—"}</div>
                   {h.comentario && <div className="text-xs text-slate-600">{h.comentario}</div>}

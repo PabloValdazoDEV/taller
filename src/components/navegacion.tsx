@@ -6,12 +6,12 @@ import { Car, ClipboardPlus, House, KanbanSquare, Users, Wrench } from "lucide-r
 import type { Rol } from "@/lib/session-token";
 
 const ITEMS = [
-  { href: "/", texto: "Inicio", icono: House, roles: ["admin", "asesor", "jefe_taller"] },
-  { href: "/recepcion/nueva", texto: "Nueva recepción", icono: ClipboardPlus, roles: ["admin", "asesor", "jefe_taller"] },
-  { href: "/tablero", texto: "Tablero", icono: KanbanSquare, roles: ["admin", "asesor", "jefe_taller", "mecanico"] },
-  { href: "/clientes", texto: "Clientes", icono: Users, roles: ["admin", "asesor", "jefe_taller"] },
-  { href: "/mis-trabajos", texto: "Mis trabajos", icono: Wrench, roles: ["mecanico", "jefe_taller"] },
-  { href: "/sustitucion", texto: "Coches sustitución", icono: Car, roles: ["admin", "asesor", "jefe_taller"] },
+  { href: "/", texto: "Inicio", corto: "Inicio", icono: House, roles: ["admin", "asesor", "jefe_taller"] },
+  { href: "/recepcion/nueva", texto: "Nueva recepción", corto: "Recepción", icono: ClipboardPlus, roles: ["admin", "asesor", "jefe_taller"] },
+  { href: "/tablero", texto: "Tablero", corto: "Tablero", icono: KanbanSquare, roles: ["admin", "asesor", "jefe_taller", "mecanico"] },
+  { href: "/clientes", texto: "Clientes", corto: "Clientes", icono: Users, roles: ["admin", "asesor", "jefe_taller"] },
+  { href: "/mis-trabajos", texto: "Mis trabajos", corto: "Mis trabajos", icono: Wrench, roles: ["mecanico", "jefe_taller"] },
+  { href: "/sustitucion", texto: "Coches sustitución", corto: "Sustitución", icono: Car, roles: ["admin", "asesor", "jefe_taller"] },
 ] as const;
 
 export function Navegacion({ rol, variante, plegada = false }: { rol: Rol; variante: "lateral" | "inferior"; plegada?: boolean }) {
@@ -38,10 +38,10 @@ export function Navegacion({ rol, variante, plegada = false }: { rol: Rol; varia
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 grid" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }}>
-      {items.map(({ href, texto, icono: I }) => (
-        <Link key={href} href={href} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${activo(href) ? "text-primary" : "text-slate-500"}`}>
+      {items.map(({ href, corto, icono: I }) => (
+        <Link key={href} href={href} className={`flex flex-col items-center justify-center gap-0.5 min-h-14 py-1.5 text-[11px] leading-tight font-medium ${activo(href) ? "text-primary" : "text-slate-500"}`}>
           <I className="size-6" />
-          <span className="truncate max-w-full px-1">{texto}</span>
+          <span className="truncate max-w-full px-0.5">{corto}</span>
         </Link>
       ))}
     </nav>
