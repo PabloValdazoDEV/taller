@@ -43,6 +43,7 @@ export function faseCliente(o: OtParaCliente): FaseCliente {
 export function queDecirle(
   o: OtParaCliente & { incidenciasCliente?: { tipo: string; descripcion: string; nuevaFecha: string | null }[] },
   hoyISO: string,
+  { sinFecha = false }: { sinFecha?: boolean } = {},
 ) {
   const fase = faseCliente(o);
   const partes: string[] = [];
@@ -71,10 +72,12 @@ export function queDecirle(
       partes.push("Lo hemos recibido y entra en breve a taller.");
       break;
     default:
-      partes.push(`Está en reparación (${o.estadoNombre.toLowerCase()}).`);
+      partes.push(/reparaci/i.test(o.estadoNombre) ? "Está en reparación." : `Está en reparación (${o.estadoNombre.toLowerCase()}).`);
   }
   const retraso = o.incidenciasCliente?.find((i) => i.tipo === "retraso_piezas" && i.nuevaFecha);
-  if (retraso) partes.push(`Ha habido un retraso de piezas; la nueva fecha es el ${fmtFecha(retraso.nuevaFecha)}.`);
+  if (sinFecha) {
+    if (retraso) partes.push("Ha habido un retraso de piezas.");
+  } else if (retraso) partes.push(`Ha habido un retraso de piezas; la nueva fecha es el ${fmtFecha(retraso.nuevaFecha)}.`);
   else if (o.fechaPrevista) partes.push(o.fechaPrevista < hoyISO ? `Iba para el ${fmtFecha(o.fechaPrevista)} y va con retraso.` : `Fecha prevista: ${fmtFecha(o.fechaPrevista)}.`);
   if (o.incidenciasCliente?.some((i) => i.tipo === "averia_adicional")) partes.push("Hemos encontrado algo más que hay que comentarle.");
   return partes.join(" ");

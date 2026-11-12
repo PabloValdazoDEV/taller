@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Car, CheckCircle2, ClipboardPlus, Clock, Hourglass,
   Phone, Receipt, ShieldCheck, UserX, Wallet, Wrench,
+  ClipboardCheck,
 } from "lucide-react";
 import { requireSesion } from "@/lib/auth";
 import { actividadSemana, citasDelDia, entregadosRecientes, flotaSustitucion, incidenciasAbiertas, listarOTsAbiertas, mecanicos, pendientesCobro } from "@/lib/data";
@@ -133,6 +134,29 @@ export default async function Inicio() {
             ))}
           </Tarjeta>
         )}
+      </Bloque>,
+    );
+
+  // Peritajes del día (lista del perito): solo si hay alguno
+  const hoyD = diaISO();
+  const peritajesHoy = tiene(P, "peritajes")
+    ? ots.filter((o) => o.datosSiniestro?.fechaPeritaje && o.datosSiniestro.fechaPeritaje <= hoyD && !o.requiereAprobacion && /perit|recep/i.test(o.estadoNombre))
+    : [];
+  if (peritajesHoy.length > 0)
+    principal.push(
+      <Bloque key="peritajes" titulo="Peritajes para hoy" icono={ClipboardCheck} n={peritajesHoy.length} accion={<Link href="/peritajes" className="text-sm font-semibold text-slate-700 hover:underline">Lista del perito</Link>}>
+        <Tarjeta className="divide-y divide-slate-100">
+          {peritajesHoy.map((o) => (
+            <Link key={o.id} href={`/ot/${o.id}`} className="flex flex-wrap items-center gap-3 p-3 hover:bg-slate-50">
+              <Matricula>{o.matricula}</Matricula>
+              <div className="min-w-40 flex-1">
+                <div className="text-sm font-semibold">{o.marca} {o.modelo}</div>
+                <div className="text-xs text-slate-500">{o.datosSiniestro?.companiaNombre ?? "Sin compañía"}{o.datosSiniestro?.perito ? ` · ${o.datosSiniestro.perito}` : ""}</div>
+              </div>
+              {o.datosSiniestro!.fechaPeritaje! < hoyD && <Pastilla color="#b91c1c">Era el {fmtFecha(o.datosSiniestro!.fechaPeritaje!)}</Pastilla>}
+            </Link>
+          ))}
+        </Tarjeta>
       </Bloque>,
     );
 

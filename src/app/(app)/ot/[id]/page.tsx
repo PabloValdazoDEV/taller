@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, Car, CheckCircle2, FileText, History, Image as ImageIcon, MessageCircle, ShieldCheck, Wrench } from "lucide-react";
+import { AlertTriangle, Car, CheckCircle2, FileText, History, Radar, Image as ImageIcon, MessageCircle, ShieldCheck, Wrench } from "lucide-react";
 import { tiene } from "@/lib/puestos";
 import { requireSesion } from "@/lib/auth";
 import { compania as listarCompanias, getOT, mecanicos as listarMecanicos } from "@/lib/data";
@@ -14,6 +14,8 @@ import { mensajeListo } from "@/lib/mensajes";
 import { enlaceWhatsapp, fmtCombustible, fmtFecha, fmtFechaHora, fmtKm, TIPO_DOCUMENTO, TIPO_INCIDENCIA } from "@/lib/formato";
 import { CompartirDocumento } from "@/components/compartir-documento";
 import { enlaceDocumento } from "@/lib/enlaces";
+import { enlaceSeguimiento } from "@/lib/seguimiento";
+import { EnlaceSeguimiento } from "@/components/enlace-seguimiento";
 import { AnularOT, AsignarMecanico, EditarDatosOT, FlujoEstados, NuevaIncidencia, ResolverIncidencia, SubirFotos } from "./controles";
 import { Importes, TrabajoPrevisto, type LineaVista } from "./importes";
 import { fmtEuros, importeLinea, ivaDeOT, totales } from "@/lib/importes";
@@ -82,6 +84,9 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
   const actaEntrega = ot.documentos.find((d) => d.tipo === "entrega");
   const enlaces = Object.fromEntries(await Promise.all(ot.documentos.map(async (d) => [d.id, await enlaceDocumento(d.id, s.tid)] as const)));
   const saludo = `Hola ${ot.cliente.nombre.split(" ")[0]}`;
+  // Enlace de seguimiento del cliente: va con el resguardo y se puede reenviar desde la ficha
+  const seguimiento = esOficina && !ot.ot.anuladaEn ? await enlaceSeguimiento(ot.ot.id, s.tid) : null;
+  const textoSeguimiento = seguimiento ? `Puede ver en todo momento cómo va su vehículo aquí: ${seguimiento}` : undefined;
   const mensajeDoc = (tipo: string) =>
     `${saludo}, le enviamos desde ${taller.nombre} su ${TIPO_DOCUMENTO[tipo]?.toLowerCase() ?? "documento"} del vehículo ${ot.vehiculo.matricula} (orden ${ot.ot.numero}).`;
   const ficheroDoc = (tipo: string) => `${TIPO_DOCUMENTO[tipo] ?? "Documento"} ${ot.vehiculo.matricula.replace(/\s/g, "")} ${ot.ot.numero}.pdf`;
@@ -116,7 +121,7 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
           {resguardo && (
             <div className="w-full border-t border-emerald-200 pt-3">
               <div className="text-sm font-medium text-emerald-900 mb-2">Enviar el resguardo al cliente</div>
-              <CompartirDocumento {...docProps(resguardo)} />
+              <CompartirDocumento {...docProps(resguardo)} extra={textoSeguimiento} />
             </div>
           )}
         </div>
@@ -406,6 +411,19 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
             </Tarjeta>
           )}
 
+          {seguimiento && (
+            <Tarjeta className="p-4">
+              <TituloSeccion><span className="inline-flex items-center gap-2"><Radar className="size-4" /> Seguimiento del cliente</span></TituloSeccion>
+              <p className="mb-3 text-xs text-slate-500">
+                Página donde el cliente ve cómo va su coche, la fecha prevista, el presupuesto pendiente y sus documentos. Ya va en el mensaje del resguardo.
+              </p>
+              <EnlaceSeguimiento
+                enlace={seguimiento}
+                whatsapp={ot.cliente.aceptaWhatsapp ? enlaceWhatsapp(ot.cliente.telefono, `${saludo}, le escribimos de ${taller.nombre}. Puede ver cómo va su ${coche} (${ot.vehiculo.matricula}) aquí: ${seguimiento}`) : null}
+              />
+            </Tarjeta>
+          )}
+
           <Tarjeta className="p-4">
             <TituloSeccion><span className="inline-flex items-center gap-2"><FileText className="size-4" /> Documentos firmados</span></TituloSeccion>
             {ot.documentos.length === 0 && <Vacio>Sin documentos.</Vacio>}
@@ -417,7 +435,7 @@ export default async function FichaOT({ params, searchParams }: { params: Promis
                     <div className="text-xs text-slate-500">Firmado por {d.firmanteNombre} · {fmtFechaHora(d.firmadoEn)}</div>
                     <div className="text-[10px] font-mono text-slate-400 truncate" title={d.sha256}>SHA-256 {d.sha256}</div>
                   </a>
-                  {esOficina && <CompartirDocumento {...docProps(d)} compacto />}
+                  {esOficina && <CompartirDocumento {...docProps(d)} extra={d.tipo === "resguardo" ? textoSeguimiento : undefined} compacto />}
                 </li>
               ))}
             </ul>

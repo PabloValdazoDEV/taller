@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CalendarDays, Car, ClipboardPlus, House, KanbanSquare, Menu, Settings, Users, Wrench, X, History, Receipt } from "lucide-react";
+import { CalendarDays, Car, ClipboardPlus, House, KanbanSquare, Menu, Settings, Users, Wrench, X, History, Receipt, ClipboardCheck } from "lucide-react";
 import { tiene, type Permiso, type Puesto } from "@/lib/puestos";
 import { cx } from "./ui";
 
@@ -13,6 +13,7 @@ const ITEMS: { href: string; texto: string; corto?: string; icono: typeof House;
   { href: "/agenda", texto: "Agenda", icono: CalendarDays, permiso: "citas" },
   { href: "/mis-trabajos", texto: "Mis trabajos", icono: Wrench, permiso: "misTrabajos" },
   { href: "/tablero", texto: "Tablero", icono: KanbanSquare, permiso: "tablero" },
+  { href: "/peritajes", texto: "Peritajes", icono: ClipboardCheck, permiso: "peritajes" },
   { href: "/clientes", texto: "Clientes", icono: Users, permiso: "clientes" },
   { href: "/historico", texto: "Histórico", icono: History, permiso: "oficina" },
   { href: "/facturacion", texto: "Facturación", icono: Receipt, permiso: "facturacion" },
@@ -80,7 +81,7 @@ export function Navegacion({ puestos, variante, plegada = false }: { puestos: Pu
       )}
       <nav
         aria-label="Menú principal"
-        className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200 grid pb-[env(safe-area-inset-bottom)]"
+        className="md:hidden print:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200 grid pb-[env(safe-area-inset-bottom)]"
         style={{ gridTemplateColumns: `repeat(${columnas}, 1fr)` }}
       >
         {visibles.map(({ href, texto, corto, icono: I }) => (

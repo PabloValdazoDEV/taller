@@ -5,6 +5,7 @@ Spec completa: `docs/ESPECIFICACION.md`. Despliegue: `docs/DESPLIEGUE.md`. Cómo
 Preparación de la visita comercial a Valrodri (qué llevar, guion de demo, preguntas): `docs/VISITA-VALRODRI.md`.
 
 ## Cómo trabajar con el usuario
+- Commits sin «Co-Authored-By» ni ninguna mención a Claude (lo pidió expresamente).
 - Pregúntale ante cualquier decisión con dudas en vez de decidir solo. Habla en español.
 - No hagas commit/push salvo que lo pida. Nunca subas `.env.local`.
 - Facturación siempre legal (con factura); no ayudar a cobrar "en negro".
@@ -55,7 +56,11 @@ Preparación de la visita comercial a Valrodri (qué llevar, guion de demo, preg
 - Incidencias: al resolver hay «Resuelta», «Descartar incidencia» y «Cancelar».
 - Recepción: la casilla de presupuesto dice «El cliente autoriza la reparación sin presupuesto previo» (también en el resguardo). Motivo de exención de IVA: obligatorio por ley (art. 6.1.j RD 1619/2012), la frase la da la gestoría.
 - Facturación (decidido 2026-11-12): factura legal emitida desde la app a través de un proveedor externo que ya cumple Verifactu (vía API), no facturación propia. Pendiente elegir proveedor. Verifactu obligatorio para sociedades el 1/1/2027 (RDL 15/2025).
-- Siguiente (propuesta): rediseño visual (bloque 4), avisos por email, enlace de seguimiento para el cliente, exportar a Excel/CSV para el programa de facturación.
+- Buscador predictivo (hecho, 2026-11-12): sugerencias desde 2 letras (`/api/buscar`, `components/buscador-global.tsx`) en la barra lateral, Inicio y /buscar (en vivo); también busca por marca/modelo.
+- Enlace de seguimiento (hecho, 2026-11-12): `/s/<token>` (JWT clave `:seguimiento`, 1 año, `src/lib/seguimiento.ts`), público, se refresca solo. Pasos Recibido → En el taller → Listo → Entregado, estado en lenguaje de cliente, fecha prevista (o la nueva por retraso de piezas), presupuesto pendiente con enlace a `/p/`, coche de sustitución, documentos firmados (`/d/`) y garantía al entregar; orden anulada → aviso. Va en el mensaje de WhatsApp del resguardo y en la ficha («Seguimiento del cliente»: WhatsApp, copiar, ver como el cliente).
+- Peritajes (hecho, 2026-11-12): `/peritajes` (permiso `peritajes`: dirección, recepción, jefe de taller). Órdenes de tipos con siniestro antes del estado de aprobación = «por peritar» (por día de peritaje, agrupadas por compañía; sin día; otros días) y en el estado de aprobación = «peritados, esperando autorización». En cada fila: día y perito editables (`fijarPeritaje`), «Peritado» (nota opcional) y «Autorizado» (nota obligatoria), «Fotos (n)» = ZIP (`/api/ot/<id>/fotos`, fflate: fotos por carpeta recepción/durante/entrega, documentos firmados y Datos.txt del siniestro). Imprimible. Inicio › «Peritajes para hoy» si hay.
+- Despliegue preparado: `scripts/alta-taller.ts` (alta de taller real + flujos base + persona de dirección, PIN 6 cifras, no borra nada), backup con copia remota opcional (`BACKUP_REMOTO`) y restauración en `docs/DESPLIEGUE.md`, nginx con `X-Real-IP`. Imagen Docker probada en local.
+- Siguiente (propuesta): rediseño visual (bloque 4), avisos por email, exportar a Excel/CSV para el programa de facturación, importador de Excel cuando lo pasen.
 
 ## Notas técnicas
 - Node 20.18 necesita el override `magic-string 0.30.21` (ya en package.json) para Tailwind 4.

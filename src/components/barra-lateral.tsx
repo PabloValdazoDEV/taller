@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { LogOut, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { Navegacion } from "./navegacion";
+import { BuscadorGlobal } from "./buscador-global";
 import { cx } from "./ui";
 import { salir } from "@/app/login/actions";
 import { tiene, type Puesto } from "@/lib/puestos";
@@ -21,7 +22,7 @@ export function BarraLateral({ taller, logo, nombre, puestosNombre, puestos, ple
   }
 
   return (
-    <aside className={cx("hidden md:flex shrink-0 flex-col bg-slate-900 text-slate-200 sticky top-0 h-dvh transition-[width] duration-200", plegada ? "w-[72px]" : "w-60")}>
+    <aside className={cx("hidden md:flex print:hidden shrink-0 flex-col bg-slate-900 text-slate-200 sticky top-0 h-dvh transition-[width] duration-200", plegada ? "w-[72px]" : "w-60")}>
       <div className={cx("border-b border-white/10 flex items-center gap-2 min-h-[72px]", plegada ? "justify-center px-2" : "px-5 justify-between")}>
         {!plegada && (
           <div className="min-w-0 flex items-center gap-3">
@@ -50,17 +51,9 @@ export function BarraLateral({ taller, logo, nombre, puestosNombre, puestos, ple
             <Search className="size-5" />
           </Link>
         ) : (
-          <form action="/buscar" className="px-3 pt-3" role="search">
-            <div className="relative">
-              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                name="q"
-                placeholder="Matrícula, cliente, nº…"
-                aria-label="Buscar matrícula, cliente o nº de orden"
-                className="w-full min-h-10 rounded-xl bg-white/10 border border-white/10 pl-9 pr-3 text-sm text-white placeholder:text-slate-400 focus:bg-white/15 focus:outline-none focus:border-white/30"
-              />
-            </div>
-          </form>
+          <div className="px-3 pt-3">
+            <BuscadorGlobal oscuro />
+          </div>
         ))}
       <Navegacion puestos={puestos} variante="lateral" plegada={plegada} />
       <div className={cx("mt-auto p-4 border-t border-white/10 flex items-center", plegada ? "justify-center" : "justify-between")}>

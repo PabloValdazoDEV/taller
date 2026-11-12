@@ -36,6 +36,8 @@ const PERMISOS = {
   importes: ["direccion", "recepcion", "facturacion", "jefe_taller"],
   /** Resumen de facturación: facturado, cobrado, pendiente, por compañía; exportar para la gestoría */
   facturacion: ["direccion", "facturacion"],
+  /** Lista del perito: coches de siniestro por peritar, fechas, fotos para la compañía */
+  peritajes: ["direccion", "recepcion", "jefe_taller"],
   /** Anular una orden dada de alta por error */
   anularOrden: ["direccion"],
 } satisfies Record<string, Puesto[]>;

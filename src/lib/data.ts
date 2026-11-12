@@ -522,6 +522,7 @@ export async function buscarGlobal(tid: string, q: string) {
     or ${t.clientes.nombre} ilike ${patron}
     or ${t.clientes.nif} ilike ${patron}
     or ${t.ordenesTrabajo.numero} ilike ${patron}
+    or (coalesce(${t.vehiculos.marca}, '') || ' ' || coalesce(${t.vehiculos.modelo}, '')) ilike ${patron}
     ${digitos.length >= 6 ? sql`or regexp_replace(coalesce(${t.clientes.telefono}, ''), '\\D', '', 'g') like ${"%" + digitos + "%"}` : sql``}
     or (${t.ordenesTrabajo.datosSiniestro}->>'numeroSiniestro') ilike ${patron}
   )`;

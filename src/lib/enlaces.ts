@@ -28,8 +28,11 @@ export async function verificarTokenDocumento(token: string): Promise<{ docId: s
 export async function urlBase() {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, "");
   const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? (h.get("host")?.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${h.get("host")}`;
+  // x-forwarded-host primero: tras un redirect de una Server Action, Next vuelve a pedir la página a sí mismo
+  // por su puerto interno (Host: localhost:3000) pero conserva las cabeceras x-forwarded-* de la petición original.
+  const host = h.get("x-forwarded-host")?.split(",")[0].trim() || h.get("host");
+  const proto = h.get("x-forwarded-proto")?.split(",")[0].trim() ?? (host?.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
 }
 
 export async function enlaceDocumento(docId: string, tallerId: string) {

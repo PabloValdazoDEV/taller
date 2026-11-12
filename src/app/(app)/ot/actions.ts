@@ -315,3 +315,22 @@ export async function anularOT(otId: string, motivo: string): Promise<R> {
   refrescar(ot.id);
   return {};
 }
+
+/** Lista del perito: apuntar o cambiar el día de peritaje y el perito sin abrir la orden. */
+export async function fijarPeritaje(otId: string, fecha: string, perito: string): Promise<R> {
+  const s = await requireSesion("peritajes");
+  const c = await cargarOT(s.tid, otId);
+  if (!c) return { error: "Orden no encontrada" };
+  const { ot } = c;
+  if (ot.cerradaEn) return { error: "La orden ya está cerrada" };
+  if (fecha && (!FECHA.test(fecha) || isNaN(Date.parse(fecha)))) return { error: "Fecha no válida" };
+  const datosSiniestro = { ...ot.datosSiniestro, fechaPeritaje: fecha || undefined, perito: perito.trim().slice(0, 80) || undefined };
+  await db
+    .update(t.ordenesTrabajo)
+    .set({ datosSiniestro, actualizadaEn: new Date() })
+    .where(and(eq(t.ordenesTrabajo.id, ot.id), isNull(t.ordenesTrabajo.cerradaEn)));
+  await auditar(s, "fijar_peritaje", "ot", ot.id, { antes: { fecha: ot.datosSiniestro?.fechaPeritaje, perito: ot.datosSiniestro?.perito }, despues: { fecha, perito } });
+  refrescar(ot.id);
+  revalidatePath("/peritajes");
+  return {};
+}

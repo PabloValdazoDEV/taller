@@ -25,8 +25,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         plegadaInicial={(await cookies()).get(COOKIE_BARRA)?.value === "1"}
       />
 
-      <div className="flex-1 min-w-0 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
-        <header className="md:hidden sticky top-0 z-20 bg-slate-900 text-white px-4 h-14 flex items-center justify-between gap-3">
+      <div className="flex-1 min-w-0 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0 print:pb-0">
+        <header className="md:hidden print:hidden sticky top-0 z-20 bg-slate-900 text-white px-4 h-14 flex items-center justify-between gap-3">
           <span className="flex items-center gap-2 min-w-0">
             {logo && (
               // eslint-disable-next-line @next/next/no-img-element

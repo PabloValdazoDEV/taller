@@ -25,7 +25,7 @@ export default async function Buscar({ searchParams }: { searchParams: Promise<{
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="space-y-3">
         <h1 className="text-2xl font-bold">Buscar</h1>
-        <BuscadorGlobal valor={q} grande autoFocus={!q} />
+        <BuscadorGlobal valor={q} grande autoFocus enVivo />
         {!q && <p className="text-sm text-slate-500">Pensado para cuando llama un cliente: escribe la matrícula, su teléfono o su nombre y verás al momento cómo va su coche y qué contarle.</p>}
         {q.length === 1 && <p className="text-sm text-slate-500">Escribe al menos 2 caracteres.</p>}
       </div>

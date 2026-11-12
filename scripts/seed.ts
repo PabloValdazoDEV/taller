@@ -213,10 +213,10 @@ async function main() {
   };
   const ots: OtDef[] = [
     { m: "1234 KLM", tipo: "siniestro", recorrido: ["Recepcionado", "Pendiente de peritaje", "Peritado", "Chapa"], trabajo: "Golpe en aleta delantera izquierda y paragolpes. Siniestro Mutua.", mecanico: "Iván", diasAtras: 4, prevista: 3,
-      siniestro: { companiaId: mutua.id, companiaNombre: mutua.nombre, numeroSiniestro: "MM-2026-884512", numeroPoliza: "PZ-55120", perito: "D. Ramírez (perito Mutua)", franquicia: 150, cubreSustitucion: true },
+      siniestro: { companiaId: mutua.id, companiaNombre: mutua.nombre, numeroSiniestro: "MM-2026-884512", numeroPoliza: "PZ-55120", perito: "D. Ramírez (perito Mutua)", fechaPeritaje: iso(diasDesdeHoy(-3)), franquicia: 150, cubreSustitucion: true },
       danos: [{ x: 22, y: 18, tipo: "Abolladura" }, { x: 50, y: 6, tipo: "Rotura" }] },
     { m: "9012 LBC", tipo: "siniestro", recorrido: ["Recepcionado", "Pendiente de peritaje"], trabajo: "Rayada lateral derecha (puertas). Pendiente de perito.", diasAtras: 1, prevista: 6,
-      siniestro: { companiaId: mutua.id, companiaNombre: mutua.nombre, numeroSiniestro: "MM-2026-901277", perito: "", franquicia: 0, cubreSustitucion: false },
+      siniestro: { companiaId: mutua.id, companiaNombre: mutua.nombre, numeroSiniestro: "MM-2026-901277", perito: "D. Ramírez (perito Mutua)", fechaPeritaje: iso(diasDesdeHoy(0)), franquicia: 0, cubreSustitucion: false },
       danos: [{ x: 80, y: 45, tipo: "Arañazo" }, { x: 80, y: 60, tipo: "Arañazo" }] },
     { m: "5678 JHG", tipo: "averia", recorrido: ["Recepcionado", "En diagnóstico", "Pendiente de aprobación"], trabajo: "Ruido al frenar y testigo de motor encendido.", mecanico: "Rubén", diasAtras: 2, prevista: 2 },
     { m: "3456 MDF", tipo: "renting", recorrido: ["Recepcionado", "Pendiente de autorización", "Esperando piezas"], trabajo: "Sustitución embrague. Vehículo de renting.", mecanico: "Sergio", diasAtras: 3, prevista: 4,

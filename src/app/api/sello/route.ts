@@ -8,7 +8,8 @@ export async function GET() {
   const taller = await tallerPorId(s.tid);
   if (!taller.selloRuta) return new Response("Sin sello", { status: 404 });
   const tipo = taller.selloRuta.endsWith(".png") ? "image/png" : "image/jpeg";
-  const datos = await leerFichero(taller.selloRuta);
+  const datos = await leerFichero(taller.selloRuta).catch(() => null);
+  if (!datos) return new Response("Sin sello", { status: 404 });
   return new Response(new Uint8Array(datos), {
     headers: { "Content-Type": tipo, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
   });

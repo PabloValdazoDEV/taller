@@ -17,6 +17,7 @@ export function CompartirDocumento({
   telefono,
   mensaje,
   nombreFichero,
+  extra,
   compacto = false,
 }: {
   docId: string;
@@ -24,6 +25,8 @@ export function CompartirDocumento({
   telefono: string | null;
   mensaje: string;
   nombreFichero: string;
+  /** Texto que se añade al final del mensaje (p. ej. el enlace de seguimiento) */
+  extra?: string;
   compacto?: boolean;
 }) {
   const fichero = useRef<File | null>(null);
@@ -59,13 +62,13 @@ export function CompartirDocumento({
   async function compartir() {
     if (!fichero.current) return;
     try {
-      await navigator.share({ files: [fichero.current], title: nombreFichero, text: mensaje });
+      await navigator.share({ files: [fichero.current], title: nombreFichero, text: extra ? `${mensaje}\n\n${extra}` : mensaje });
     } catch (e) {
       if ((e as Error).name !== "AbortError") setAviso("No se pudo compartir. Usa el enlace por WhatsApp.");
     }
   }
 
-  const textoConEnlace = `${mensaje}\n\n${enlace}\n(Enlace personal, válido 30 días)`;
+  const textoConEnlace = `${mensaje}\n\n${enlace}\n(Enlace personal, válido 30 días)${extra ? `\n\n${extra}` : ""}`;
   const wa = enlaceWhatsapp(telefono, textoConEnlace);
   const btn = cx(
     "inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition",
